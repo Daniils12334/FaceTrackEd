@@ -81,25 +81,20 @@ Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzī
 
 FaceTrackEd/
 ├── README.md                # Projekta apraksts, ToDo un dokumentācija
-├── requirements.txt         # Visas Python dependences: face_recognition, opencv-python, pandas u.c.
+├── requirements.txt         # Python dependences: face_recognition, opencv-python, pandas, matplotlib
 ├── config.py                # Konfigurācijas constants (piem., ceļi, thresholds)
 │
 ├── data/
-│   └── atteli/              # Mape ar testēšanas attēliem (persona1.jpg, ...)
+│   └── atteli/              # Testēšanas attēli (persona1.jpg, persona2.jpg, ...)
 │
-├── students.csv             # Datubāze: id,name,encoding (JSON string)
-├── log.csv                  # Žurnāls: timestamp,student_id,action
+├── students.csv             # Datubāze: id, name, encoding (JSON string)
+├── log.csv                  # Žurnāls: timestamp, student_id, action
 │
-├── main.py                  # Galvenais izpildāmais fails (CLI menu)
-│
-├── face_module.py           # Seju detekcija/atpazīšana (wrapper ap face_recognition/OpenCV)
-│
-├── db_module.py             # Funkcijas CSV nolasīšanai/rakstīšanai (students.csv, log.csv)
-│
-├── stats_module.py          # Statistikas aprēķini un grafiku ģenerēšana (Matplotlib)
-│
-└── utils.py                 # Palīgfunkcijas (piem., serialize_encoding, timestamp)
-
+├── main.py                  # Galvenais izpildāmais fails (CLI izvēlne)
+├── face_module.py           # Seju detekcija/atpazīšana
+├── db_module.py             # CSV nolasīšana/rakstīšana (students.csv, log.csv)
+├── stats_module.py          # Statistikas aprēķini un grafiku ģenerēšana
+└── utils.py                 # Palīgfunkcijas (serialize_encoding, timestamp u.c.)
 
 
 ## ✅ To-Do
