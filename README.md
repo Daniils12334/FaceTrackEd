@@ -79,7 +79,27 @@ Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzī
 
 ## 📁 Struktūra (piemērs)
 
-FaceTrackEd/ ├── main.py ├── students.csv ├── log.csv ├── data/ │ └── atteli/ └── screenshots/
+FaceTrackEd/
+├── README.md                # Projekta apraksts, ToDo un dokumentācija
+├── requirements.txt         # Visas Python dependences: face_recognition, opencv-python, pandas u.c.
+├── config.py                # Konfigurācijas constants (piem., ceļi, thresholds)
+│
+├── data/
+│   └── atteli/              # Mape ar testēšanas attēliem (persona1.jpg, ...)
+│
+├── students.csv             # Datubāze: id,name,encoding (JSON string)
+├── log.csv                  # Žurnāls: timestamp,student_id,action
+│
+├── main.py                  # Galvenais izpildāmais fails (CLI menu)
+│
+├── face_module.py           # Seju detekcija/atpazīšana (wrapper ap face_recognition/OpenCV)
+│
+├── db_module.py             # Funkcijas CSV nolasīšanai/rakstīšanai (students.csv, log.csv)
+│
+├── stats_module.py          # Statistikas aprēķini un grafiku ģenerēšana (Matplotlib)
+│
+└── utils.py                 # Palīgfunkcijas (piem., serialize_encoding, timestamp)
+
 
 
 ## ✅ To-Do
