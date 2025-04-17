@@ -106,33 +106,33 @@ FaceTrackEd/
 ---
 
 ### 🔹 Datu struktūras un klase
-- [ ] Izveidot `Student` klasi ar laukiem: `id`, `name`, `encoding`
-- [ ] Izveidot CSV failu `students.csv`, kur glabāt datus
-- [ ] Pievienot iespēju saglabāt / nolasīt `encoding` sarakstu no CSV
+- [x] Izveidot `Student` klasi ar laukiem: `id`, `name`, `encoding`
+- [x] Izveidot CSV failu `students.csv`, kur glabāt datus
+- [x] Pievienot iespēju saglabāt / nolasīt `encoding` sarakstu no CSV
 
 ---
 
 ### 🔹 Seju atpazīšanas funkcionalitāte
-- [ ] Ielādēt attēlu vai video
-- [ ] Atpazīt sejas attēlā ar `face_recognition`
-- [ ] Salīdzināt ar esošajām sejām datubāzē
-- [ ] Ja seja neatpazīta – brīdināt un piedāvāt pievienot
+- [x] Ielādēt attēlu vai video
+- [x] Atpazīt sejas attēlā ar `face_recognition`
+- [x] Salīdzināt ar esošajām sejām datubāzē
+- [x] Ja seja neatpazīta – brīdināt un piedāvāt pievienot
 
 ---
 
 ### 🔹 Statistikas funkcijas
-- [ ] Saglabāt katru atpazīšanu `log.csv` ar laiku un skolēna ID
-- [ ] Iegūt statistiku par parādīšanās biežumu
+- [x] Saglabāt katru atpazīšanu `log.csv` ar laiku un skolēna ID
+- [x] Iegūt statistiku par parādīšanās biežumu
 - [ ] Izveidot grafikus ar `Matplotlib` (papildus iespēja)
 
 ---
 
 ### 🔹 Lietotāja interfeiss (CLI)
-- [ ] Izveidot vienkāršu izvēlni terminālī:
+- [x] Izveidot vienkāršu izvēlni terminālī:
   - [ ] ✅ Atpazīt seju
   - [ ] ➕ Pievienot jaunu studentu
   - [ ] 📊 Apskatīt statistiku
-- [ ] Validēt ievadītos datus (piemēram, vārda ievade)
+- [x] Validēt ievadītos datus (piemēram, vārda ievade)
 
 ---
 
