@@ -81,7 +81,8 @@ Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzī
 
 FaceTrackEd/ ├── main.py ├── students.csv ├── log.csv ├── data/ │ └── atteli/ └── screenshots/
 
-✅ FaceTrackEd – ToDo saraksts
+
+###✅ FaceTrackEd – ToDo saraksts
 🔹 1. Projekta sākums
 
 Izveidot GitHub repozitoriju: FaceTrackEd
