@@ -1,25 +1,83 @@
 import face_recognition
 from face_recognition import face_encodings, load_image_file
-import datetime
 import csv
+import cv2
+from datetime import datetime, timedelta
+from face_recognition import face_locations, face_encodings, compare_faces, face_distance
+from config import MONITOR_SETTINGS, CAMERA, RECOGNITION, PERFORMANCE, LOGGING, UI, DEBUG_SETTINGS
+from collections import deque
+import numpy as np
+from typing import List, Tuple, Dict
 
-def recognize_faces(image_path, students):
-    results = []
-    image = load_image_file(image_path)
-    face_encodings = face_recognition.face_encodings(image)
-    
-    for encoding in face_encodings:
-        match = False
-        for student in students:
-            if face_recognition.compare_faces([student.encoding], encoding, tolerance=0.6)[0]:
-                results.append((student.name, student.student_id, True))
-                match = True
-                break
-        
-        if not match:
-            results.append(("", "", False))
-    
-    return results
+from config import UI, DEBUG_SETTINGS
+
+def recognize_faces(
+    frame: np.ndarray,
+    known_encodings: List[np.ndarray],
+    known_names: List[str],
+    debug: bool = False
+) -> Tuple[List[str], np.ndarray]:
+    """
+    Распознаёт лица на кадре и возвращает список имён и кадр с отрисованными рамками.
+
+    :param frame: Исходное изображение (в формате BGR, как из OpenCV)
+    :param known_encodings: Эмбеддинги известных лиц
+    :param known_names: Список имён, соответствующих эмбеддингам
+    :param debug: Включить визуализацию (True/False)
+    :return: Список распознанных имён и обработанный кадр
+    """
+    # Конвертируем в RGB, т.к. face_recognition использует RGB
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Находим лица и эмбеддинги
+    face_locations = face_recognition.face_locations(
+        rgb_frame,
+        model=RECOGNITION['model'],
+        number_of_times_to_upsample=RECOGNITION['upsample_times']
+    )
+    encodings = face_recognition.face_encodings(
+        rgb_frame, 
+        face_locations, 
+        num_jitters=RECOGNITION['jitter']
+    )
+
+    names = []
+    for encoding in encodings:
+        matches = face_recognition.compare_faces(known_encodings, encoding, tolerance=RECOGNITION['tolerance'])
+        name = "Unknown"
+
+        if any(matches):
+            face_distances = face_recognition.face_distance(known_encodings, encoding)
+            best_match_idx = np.argmin(face_distances)
+            if matches[best_match_idx]:
+                name = known_names[best_match_idx]
+
+        names.append(name)
+
+    # Визуализация
+    output_frame = frame.copy()
+    if debug:
+        for (top, right, bottom, left), name in zip(face_locations, names):
+            color = UI['box_color'] if name != "Unknown" else (0, 0, 255)
+
+            # Рамка
+            cv2.rectangle(output_frame, (left, top), (right, bottom), color, UI['box_thickness'])
+
+            # Подложка под текст
+            cv2.rectangle(output_frame, (left, bottom - 25), (right, bottom), color, cv2.FILLED)
+
+            # Текст
+            cv2.putText(
+                output_frame,
+                name,
+                (left + 6, bottom - 6),
+                cv2.FONT_HERSHEY_DUPLEX,
+                UI['font_scale'],
+                UI['text_color'],
+                1
+            )
+
+    return names, output_frame
 
 def add_student(image_path: str, name: str, student_id: str, csv_path: str = 'students.csv') -> bool:
     """

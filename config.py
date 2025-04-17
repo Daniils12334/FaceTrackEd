@@ -15,15 +15,12 @@ CAMERA = {
     'flip_horizontal': False
 }
 
-# Настройки распознавания
 RECOGNITION = {
-    'model': 'hog',
-    'tolerance': 0.5,
+    'model': 'hog',  # или 'cnn', если у тебя мощная видеокарта
     'upsample_times': 1,
     'jitter': 1,
-    'process_every_n_frame': 1
+    'tolerance': 0.45  # чем меньше, тем строже
 }
-
 # Настройки производительности
 PERFORMANCE = {
     'scale_factor': 0.5,
@@ -44,11 +41,10 @@ LOGGING = {
 
 # Настройки интерфейса
 UI = {
-    'box_color': (0, 255, 0),  # Зеленый цвет в BGR формате
-    'text_color': (0, 0, 0),    # Черный текст
-    'box_thickness': 2,         # Толщина рамки в пикселях
-    'font_scale': 0.7,         # Размер шрифта
-    'show_fps': True
+    'box_color': (0, 255, 0),  # зелёная рамка
+    'box_thickness': 2,
+    'font_scale': 0.5,
+    'text_color': (255, 255, 255)
 }
 
 # Настройки отладки

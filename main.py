@@ -1,135 +1,131 @@
 from db_module import load_students
 from face_module import recognize_faces, add_student
-from stats_module import (init_log_file, log_recognition, 
-                         get_daily_attendance, get_student_stats,
-                         print_monthly_report, save_monthly_stats_to_csv)
+from stats_module import (
+    init_log_file, 
+    log_recognition,
+    get_daily_attendance,
+    get_student_stats,
+    print_monthly_report,
+    save_monthly_stats_to_csv
+)
 from monitor_module import FaceMonitor
 import datetime
+import cv2
 
-init_log_file()  # Инициализация лог-файла
+init_log_file()
 
 def main():
-    students_db = load_students()  # Загрузка базы студентов
+    students_db = load_students()
     
     while True:
         print("\n--- FaceTrackEd ---")
-        print("1. Atpazīt seju (image)")
-        print("2. Pievienot studentu")
-        print("3. Statistika")
-        print("4. Realtime Monitoring (Webcam)")
-        print("0. Iziet")
+        print("1. Распознать по изображению")
+        print("2. Добавить студента")
+        print("3. Статистика")
+        print("4. Режим реального времени")
+        print("0. Выход")
         
-        choice = input("Izvēlies opciju: ")
+        choice = input("Выберите опцию: ")
         
         if choice == '1':
-            image_path = input("Attēla ceļš: ")
-            results = recognize_faces(image_path, students_db)
+            image_path = input("Путь к изображению: ")
+            frame = cv2.imread(image_path)
             
-            for name, student_id, known in results:
-                if known:
-                    print(f"✅ Atpazīts: {name} (ID: {student_id})")
-                    log_recognition([(name, student_id, True)])
-                else:
-                    print(f"⚠️ Nezināma seja!")
-                    add_new = input("Vai vēlies pievienot šo studentu? (y/n): ")
-                    if add_new.lower() == 'y':
-                        student_name = input("Ievadi studenta vārdu: ")
-                        student_id = input("Ievadi studenta ID: ")
-                        if add_student(image_path, student_name, student_id):
-                            students_db = load_students()  # Обновляем базу
-
-        elif choice == '2':
-            student_name = input("Ievadi studenta vārdu: ")
-            student_id = input("Ievadi studenta ID: ")
-            image_path = input("Attēla ceļš: ")
-            if add_student(image_path, student_name, student_id):
-                students_db = load_students()
-                print(f"✅ Students {student_name} pievienots!")
-
-        elif choice == '3':
-            while True:
-                print("\n--- Statistika ---")
-                print("1. Studentu statistika")
-                print("2. Dienas statistika")
-                print("3. Mēneša statistika")
-                print("4. Atpakaļ")
-                
-                stat_choice = input("Izvēlēties opciju: ")
-                
-                if stat_choice == '1':
-                    student_id = input("Ievadiet studenta ID: ").strip()
-                    stats = get_student_stats(student_id)
-                    if stats:
-                        print(f"\nStatistika studentam ID: {student_id}")
-                        print("-"*40)
-                        for entry in stats:
-                            print(f"Datums: {entry['date']} | Laiks: {entry['time']}")
-                        print(f"\nKopā apmeklējumi: {len(stats)}")
-                    else:
-                        print("⚠️ Nav datu par šo studentu!")
-                        
-                elif stat_choice == '2':
-                    date = input("Ievadiet datumu (YYYY-MM-DD): ").strip()
-                    try:
-                        datetime.datetime.strptime(date, "%Y-%m-%d")
-                    except ValueError:
-                        print("⚠️ Nepareizs datuma formāts!")
-                        continue
-                        
-                    attendance = get_daily_attendance(date)
-                    if attendance:
-                        print(f"\nApmeklējumi {date}:")
-                        print("-"*40)
-                        for record in attendance:
-                            print(f"ID: {record['student_id']} | Vārds: {record['name']} | Laiks: {record['time']}")
-                        print(f"\nKopā: {len(attendance)} apmeklējumi")
-                    else:
-                        print(f"⚠️ Nav datu par {date}!")
-                        
-                elif stat_choice == '3':
-                    month = input("Ievadiet mēnesi (YYYY-MM): ").strip()
-                    print("\n1. Skatīt statistiku")
-                    print("2. Eksportēt uz CSV")
-                    
-                    sub_choice = input("Izvēlieties: ")
-                    if sub_choice == '1':
-                        print_monthly_report(month)
-                    elif sub_choice == '2':
-                        filename = input("Faila nosaukums (bez .csv): ") + ".csv"
-                        save_monthly_stats_to_csv(month, filename)
-                    else:
-                        print("Nepareiza izvēle!")
-                        
-                elif stat_choice == '4':
-                    break
-                    
-                else:
-                    print("Nepareiza izvēle!")
-
-        elif choice == '4':  # Режим реального времени
-            if not students_db:
-                print("⚠️ Nav studentu datu! Vispirms pievienojiet studentus.")
+            if frame is None:
+                print("Ошибка загрузки изображения!")
                 continue
                 
-            print("\n--- Režīms Reālā Laika ---")
-            print("1. Uzsākt monitoring")
-            print("2. Atpakaļ")
+            known_encodings = [s['encoding'] for s in students_db]
+            known_names = [s['name'] for s in students_db]
             
-            monitor_choice = input("Izvēlieties: ")
+            names, processed_frame = recognize_faces(
+                frame, 
+                known_encodings,
+                known_names,
+                debug=True
+            )
             
-            if monitor_choice == '1':
-                monitor = FaceMonitor(students_db)
-                print("\nMonitoring started. Press:")
-                print("- 'q' to quit")
-                print("- 's' to save current frame")
-                monitor.start_monitoring()
+            cv2.imshow('Результат', processed_frame)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            
+            recognized_data = []
+            for name in names:
+                if name == "Unknown":
+                    recognized_data.append(("Unknown", "unknown", False))
+                else:
+                    student = next((s for s in students_db if s['name'] == name), None)
+                    student_id = student['student_id'] if student else "unknown"
+                    recognized_data.append((name, student_id, True))
+
+            log_recognition(recognized_data)
+
+        elif choice == '2':
+            student_name = input("Имя студента: ")
+            student_id = input("ID студента: ")
+            image_path = input("Путь к фото: ")
+            
+            if add_student(image_path, student_name, student_id):
+                students_db = load_students()
+                print(f"Студент {student_name} добавлен!")
+
+        elif choice == '3':
+            _handle_statistics_menu(students_db)
+
+        elif choice == '4':
+            if not students_db:
+                print("Сначала добавьте студентов!")
+                continue
                 
+            monitor = FaceMonitor(students_db, debug_mode=True)
+            print("Запуск мониторинга... (Нажмите Q для выхода)")
+            monitor.start_monitoring()
+
         elif choice == '0':
-            print("Programma tiek izslēgta...")
+            print("Выход...")
             break
-            
-        else:
-            print("Nepareiza izvēle! Mēģiniet vēlreiz.")
+
+def _handle_statistics_menu(students_db):
+    """Меню статистики"""
+    while True:
+        print("\n--- Статистика ---")
+        print("1. По студенту")
+        print("2. За день")
+        print("3. За месяц")
+        print("4. Назад")
+        
+        sub_choice = input("Выбор: ")
+        
+        if sub_choice == '1':
+            student_id = input("ID студента: ")
+            stats = get_student_stats(student_id)
+            if stats:
+                print(f"\nИстория посещений для ID {student_id}:")
+                for record in stats:
+                    print(f"{record['date']} {record['time']} — {record['name']}")
+            else:
+                print("Нет данных о посещениях.")
+
+        elif sub_choice == '2':
+            date = input("Дата (YYYY-MM-DD): ")
+            attendance = get_daily_attendance(date)
+            if attendance:
+                print(f"\nПосещения за {date}:")
+                for record in attendance:
+                    print(f"{record['time']} — {record['name']} (ID: {record['student_id']})")
+            else:
+                print("Нет посещений за указанную дату.")
+
+        elif sub_choice == '3':
+            month = input("Месяц (YYYY-MM): ")
+            print_monthly_report(month)
+            save_csv = input("Сохранить в CSV? (y/n): ").strip().lower()
+            if save_csv == 'y':
+                save_monthly_stats_to_csv(month)
+                print("Отчёт сохранён в CSV.")
+
+        elif sub_choice == '4':
+            break
 
 if __name__ == '__main__':
     main()
