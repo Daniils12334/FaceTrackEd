@@ -82,68 +82,55 @@ Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzī
 FaceTrackEd/ ├── main.py ├── students.csv ├── log.csv ├── data/ │ └── atteli/ └── screenshots/
 
 
-###✅ FaceTrackEd – ToDo saraksts
-🔹 1. Projekta sākums
+## ✅ To-Do
 
-Izveidot GitHub repozitoriju: FaceTrackEd
+### 🔹 Projekta sākums
+- [ ] Izveidot GitHub repozitoriju: `FaceTrackEd`
+- [ ] Izveidot `README.md` ar problēmas aprakstu, mērķiem un plānu
+- [ ] Sagatavot testēšanas attēlus (studentu sejas)
 
-Izveidot README.md ar problēmas aprakstu, mērķiem un plānu
+---
 
-    Sagatavot testēšanas attēlus (studentu sejas)
+### 🔹 Datu struktūras un klase
+- [ ] Izveidot `Student` klasi ar laukiem: `id`, `name`, `encoding`
+- [ ] Izveidot CSV failu `students.csv`, kur glabāt datus
+- [ ] Pievienot iespēju saglabāt / nolasīt `encoding` sarakstu no CSV
 
-🔹 2. Datu struktūras un klase
+---
 
-Izveidot Student klasi ar laukiem: id, name, encoding
+### 🔹 Seju atpazīšanas funkcionalitāte
+- [ ] Ielādēt attēlu vai video
+- [ ] Atpazīt sejas attēlā ar `face_recognition`
+- [ ] Salīdzināt ar esošajām sejām datubāzē
+- [ ] Ja seja neatpazīta – brīdināt un piedāvāt pievienot
 
-Izveidot CSV failu students.csv, kur glabāt datus
+---
 
-    Pievienot iespēju saglabāt / nolasīt encoding sarakstu no CSV
+### 🔹 Statistikas funkcijas
+- [ ] Saglabāt katru atpazīšanu `log.csv` ar laiku un skolēna ID
+- [ ] Iegūt statistiku par parādīšanās biežumu
+- [ ] Izveidot grafikus ar `Matplotlib` (papildus iespēja)
 
-🔹 3. Seju atpazīšanas funkcionalitāte
+---
 
-Ielādēt attēlu vai video
+### 🔹 Lietotāja interfeiss (CLI)
+- [ ] Izveidot vienkāršu izvēlni terminālī:
+  - [ ] ✅ Atpazīt seju
+  - [ ] ➕ Pievienot jaunu studentu
+  - [ ] 📊 Apskatīt statistiku
+- [ ] Validēt ievadītos datus (piemēram, vārda ievade)
 
-Atpazīt sejas attēlā ar face_recognition
+---
 
-Salīdzināt ar esošajām sejām datubāzē
+### 🔹 Testēšana
+- [ ] Testēt ar vairākām sejām un attēliem
+- [ ] Simulēt kļūdas (piemēram, nav encodinga)
+- [ ] Testēt CSV failu bojājumus un atkopšanu
 
-    Ja seja neatpazīta – brīdināt un piedāvāt pievienot
+---
 
-🔹 4. Statistikas funkcijas
-
-Saglabāt katru atpazīšanu log.csv ar laiku un skolēna ID
-
-Iegūt statistiku par parādīšanās biežumu
-
-    Izveidot grafikus ar Matplotlib (papildus)
-
-🔹 5. Lietotāja interfeiss
-
-Izveidot vienkāršu izvēlni terminālī:
-
-    ✅ Atpazīt seju
-
-    ➕ Pievienot jaunu studentu
-
-    📊 Apskatīt statistiku
-
-    Pievienot validācijas (piemēram, vārda ievade)
-
-🔹 6. Testēšana
-
-Testēt ar vairākām sejām
-
-Simulēt kļūdas (piemēram, nav encodinga)
-
-    Testēt CSV failu bojājumus / nolasīšanu
-
-🔹 7. Prezentācijai
-
-Uztaisīt ekrānšāviņus katram posmam (atpazīšana, kļūda, pievienošana)
-
-Aprakstīt projekta norisi prezentācijā
-
-    Izveidot demonstrācijas video vai īsu demo failu
-
-Gribi, lai arī sadalu šo pa nedēļām kā plānu uz 1,5 mēnešiem? Tas varētu palīdzēt prezentācijā vai plānošanā.
+### 🔹 Prezentācijai
+- [ ] Uztaisīt ekrānšāviņus: atpazīšana, kļūda, pievienošana
+- [ ] Aprakstīt projekta gaitu prezentācijā (PowerPoint vai PDF)
+- [ ] Izveidot demonstrācijas video vai ekrānuzņēmumu GIF
 
