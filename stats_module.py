@@ -20,20 +20,18 @@ def log_recognition(results: List[Tuple[str, str, bool]]):
     """
     log_path = 'attendance_log.csv'
     current_time = dt.now()
-    
+
     with open(log_path, 'a', encoding='utf-8', newline='') as file:
         writer = csv.writer(file)
-        
+
         for name, student_id, recognized in results:
             if recognized:
-                record = [
-                    name,
-                    student_id,
-                    current_time.strftime("%Y-%m-%d"),
-                    current_time.strftime("%H:%M:%S"),
-                    current_time.isoformat()
-                ]
+                date_str = current_time.strftime("%Y-%m-%d")
+                time_str = current_time.strftime("%H:%M:%S")
+                timestamp = current_time.isoformat(sep=' ')
+                record = [name, student_id, date_str, time_str, timestamp]
                 writer.writerow(record)
+
 
 def load_attendance_data(log_path='attendance_log.csv'):
     data = []
@@ -50,16 +48,14 @@ def load_attendance_data(log_path='attendance_log.csv'):
                     continue
                     
                 try:
-                    timestamp_str = row.get('timestamp', '')
-                    if not timestamp_str:
-                        continue
-                        
-                    timestamp = dt.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    # Унифицированный парсинг timestamp
+                    timestamp_str = row['timestamp'].replace('T', ' ')
+                    timestamp = dt.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
                     
                     record = {
                         'name': row.get('name', ''),
                         'student_id': row.get('student_id', ''),
-                        'timestamp': timestamp_str,
+                        'timestamp': timestamp,
                         'date': timestamp.strftime("%Y-%m-%d"),
                         'time': timestamp.strftime("%H:%M:%S")
                     }
