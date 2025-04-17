@@ -85,8 +85,8 @@ FaceTrackEd/ ├── main.py ├── students.csv ├── log.csv ├─�
 ## ✅ To-Do
 
 ### 🔹 Projekta sākums
-- [ ] Izveidot GitHub repozitoriju: `FaceTrackEd`
-- [ ] Izveidot `README.md` ar problēmas aprakstu, mērķiem un plānu
+- [x] Izveidot GitHub repozitoriju: `FaceTrackEd`
+- [x] Izveidot `README.md` ar problēmas aprakstu, mērķiem un plānu
 - [ ] Sagatavot testēšanas attēlus (studentu sejas)
 
 ---
