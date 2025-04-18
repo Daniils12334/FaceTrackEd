@@ -2,7 +2,9 @@
   "file_paths": {
     "students_csv": "data/students.csv",
     "log_csv": "data/attendance_log.csv",
-    "faces_dir": "data/faces/"
+    "faces_dir": "data/faces/",
+    "settings_json": "config/settings.json"
+
   },
   "camera": {
     "camera_id": 0,

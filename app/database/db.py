@@ -15,7 +15,7 @@ class StudentDatabase:
     def save_students(self, student: dict):
         pass
 
-class AttendanceLoger:
+class AttendanceLogger:
         def __init__(self, log_path: str):
             self.log_path = log_path
 
