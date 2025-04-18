@@ -1,172 +1,174 @@
-# FaceTrackEd
+FaceTrackEd
 
-Gudra seju atpazīšanas sistēma skolēnu uzskaitei un statistikai. Projekts veidots ar Python, izmantojot `face_recognition`, `OpenCV` un `Pandas`. Lietotne automātiski atpazīst skolēnus no attēliem vai video un apkopo datus par viņu parādīšanās biežumu.
+FaceTrackEd is an advanced student attendance tracking and statistical analysis system built with Python, utilizing face_recognition, OpenCV, and Pandas. The application automatically detects students from images or videos and collects data on their attendance frequency.
+🔍 Problem Analysis
+Problem Description
 
----
+Traditional student attendance tracking (e.g., using a physical roll-call or manually marking attendance) is slow, prone to human error, and time-consuming. Automated face recognition allows for faster processes, reduces errors, and collects additional statistical data.
+Target Audience
 
-## 🔍 Analīze
+    School administration and teachers
 
-### Problēmas apraksts
+    Technology departments or faculties
 
-Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzīmējot apmeklējumu) ir lēna, pakļauta cilvēciskām kļūdām un laikietilpīga. Automatizēta seju atpazīšana ļauj paātrināt procesu, mazināt kļūdas un savākt papildus statistiku.
+    Programmers looking to expand their knowledge in computer vision
 
-### Mērķauditorija
+Analysis of Existing Solutions
+Name	Description	Pros	Cons
+OpenCV Attendance System (GitHub)	Simple script for attendance tracking	Easy to understand, good base	No statistics, no verification
+Commercial solutions (FaceFirst, Trueface)	Professional systems	Accurate, secure	Paid, no open-source, non-customizable
+DIY CSV + Camera	Basic face detection	Simple	No recognition, only detection
 
-- Skolu administrācija un skolotāji
-- Tehnoloģiju skolas vai fakultātes
-- Programmētāji, kuri vēlas paplašināt zināšanas par datorredzi
+🧩 Design
+Functional Requirements
 
-### Eksistējošo risinājumu analīze
+    Recognize student faces from images or videos.
 
-| Nosaukums | Apraksts | Plusi | Mīnusi |
-|----------|----------|--------|--------|
-| OpenCV Attendance System (GitHub) | Vienkāršs skripts apmeklējuma reģistrēšanai | Viegli saprotams, labs pamats | Nav statistikas, nav verifikācijas |
-| Commercial solutions (FaceFirst, Trueface) | Profesionālas sistēmas | Precīzas, drošas | Maksas, nav atvērtā koda, nav pielāgojamas |
-| Paštaisīti CSV + kamera | Minimāla seju detekcija | Vienkārši | Nav atpazīšanas, tikai detekcija |
+    Store student ID, name, and face encoding in a database (CSV).
 
-📸 *(Ekrānšāviņus vari pievienot vēlāk ar reāliem piemēriem no sava koda!)*
+    Log each appearance with date and time.
 
----
+    Alert when a face is not recognized (unknown student).
 
-## 🧩 Projektēšana
+    Allow adding a new student to the database.
 
-### Funkcionālās prasības
-1. Atpazīt skolēnu sejas no attēliem vai video
-2. Glabāt skolēnu ID, vārdu un sejas kodējumu datubāzē (CSV)
-3. Pierakstīt katru parādīšanās reizi ar laiku
-4. Brīdināt, ja seja nav atpazīta (nezināms students)
-5. Ļaut pievienot jaunu studentu datubāzei
+Non-Functional Requirements
 
-### Nefunkcionālās prasības
-1. Lietotnei jābūt izpildāmai no konsoles (CLI)
-2. Darbībai jābūt iespējamai bez interneta
-3. Jāstrādā ar attēlu vai video failiem (ne obligāti reāllaikā)
-4. Lietotāja interfeisam jābūt vienkāršam un saprotamam
-5. Datu glabāšanai jābūt drošai (nav piekļuves trešajām pusēm)
+    The application should run via the console (CLI).
 
----
+    Operation should be possible without internet access.
 
-## 🗓️ Plānošana – darba uzdevumu saraksts
+    Should work with image or video files (not necessarily in real-time).
 
-1. Izveidot `Student` klasi ar ID, vārdu un sejas enkodējumu
-2. Realizēt CSV datubāzes lasīšanu un rakstīšanu
-3. Implementēt sejas atpazīšanu ar `face_recognition`
-4. Saglabāt notikumu žurnālu ar datumu/laiku
-5. Izveidot CLI izvēlni (atpazīšana / pievienošana / statistika)
+    The user interface should be simple and intuitive.
 
----
+    Data storage should be secure (no third-party access).
 
-## 🎥 Risinājuma prezentācija
+🗓️ Planning – Task List
 
-🧪 Pievienotie ekrānšāviņi:
+    Create a Student class with fields: id, name, and encoding.
 
-- ✅ Seja atpazīta → uz ekrāna parādās vārds un laiks
-- ⚠️ Nezināma seja → brīdinājums un piedāvājums pievienot
-- 📈 Statistikas CSV fails ar skolēna vārdu, datumu un reižu skaitu
+    Implement CSV database reading and writing.
 
-*(Ekrānšāviņus vari augšupielādēt savā GitHub repozitorijā mapē `/screenshots/`)*
+    Implement face recognition with face_recognition.
 
----
+    Log events with date and time.
 
-## 💻 Tehnoloģijas
+    Develop a CLI menu (recognition / add / statistics).
 
-- Python 3.x
-- face_recognition
-- OpenCV
-- Pandas
+🎥 Solution Presentation
 
----
+    pass
 
-## 📁 Struktūra (piemērs)
+💻 Technologies
 
-FaceTrackEd/
-├── main.py                       # Точка входа в программу
-├── requirements.txt              # Зависимости проекта
-├── README.md                     # Документация проекта
-├── config/
-│   └── settings.json             # Настройки в формате JSON
-│   └── settings.py               # Класс загрузки настроек
-├── data/
-│   ├── students.csv              # База данных студентов
-│   ├── log.csv                   # Лог посещений
-│   └── faces/                    # Папка с изображениями лиц студентов
-├── app/
-│   ├── __init__.py
-│   ├── database/
-│   │   ├── __init__.py
-│   │   ├── db.py                 # Классы: StudentDatabase, AttendanceLogger
-│   ├── face/
-│   │   ├── __init__.py
-│   │   ├── recognition.py        # Класс: FaceRecognizer
-│   ├── stats/
-│   │   ├── __init__.py
-│   │   ├── analytics.py          # Класс: AttendanceStats
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── helpers.py            # Класс: TimeUtils и прочие утилиты
-│   └── core/
-│       ├── __init__.py
-│       ├── app.py                # Класс: FaceTrackApp — главный контроллер
+    Python 3.x
 
-# Пояснение по файлам:
-# - main.py — запускает приложение, вызывает FaceTrackApp.run()
-# - settings.json — хранит пути, настройки камеры, формат даты и т.д.
-# - db.py — управляет загрузкой/сохранением студентов и логов
-# - recognition.py — кодирует и распознает лица с камеры
-# - analytics.py — обрабатывает и отображает статистику
-# - app.py — объединяет всё в единое приложение
-# - helpers.py — содержит утилиты: таймстемпы, работа с путями и т.д.
+    face_recognition
 
+    OpenCV
 
-## ✅ To-Do
+    Pandas
 
-### 🔹 Projekta sākums
-- [x] Izveidot GitHub repozitoriju: `FaceTrackEd`
-- [x] Izveidot `README.md` ar problēmas aprakstu, mērķiem un plānu
-- [ ] Sagatavot testēšanas attēlus (studentu sejas)
+📁 Project Structure
 
----
+    FaceTrackEd/
+    ├── main.py                 
+    ├── requirements.txt              
+    ├── README.md                    
+    ├── config/
+    │   └── settings.json       
+    │   └── settings.py          
+    ├── data/
+    │   ├── students.csv         
+    │   ├── log.csv                  
+    │   └── faces/              
+    ├── app/
+    │   ├── __init__.py
+    │   ├── database/
+    │   │   ├── __init__.py
+    │   │   ├── db.py                
+    │   ├── face/
+    │   │   ├── __init__.py
+    │   │   ├── recognition.py        
+    │   ├── stats/
+    │   │   ├── __init__.py
+    │   │   ├── analytics.py         
+    │   ├── utils/
+    │   │   ├── __init__.py
+    │   │   ├── helpers.py            
+    │   └── core/
+    │       ├── __init__.py
+    │       ├── app.py                
 
-### 🔹 Datu struktūras un klase
-- [x] Izveidot `Student` klasi ar laukiem: `id`, `name`, `encoding`
-- [x] Izveidot CSV failu `students.csv`, kur glabāt datus
-- [x] Pievienot iespēju saglabāt / nolasīt `encoding` sarakstu no CSV
+File Explanations:
 
----
+    main.py – Starts the application, calls FaceTrackApp.run().
 
-### 🔹 Seju atpazīšanas funkcionalitāte
-- [x] Ielādēt attēlu vai video
-- [x] Atpazīt sejas attēlā ar `face_recognition`
-- [x] Salīdzināt ar esošajām sejām datubāzē
-- [x] Ja seja neatpazīta – brīdināt un piedāvāt pievienot
+    settings.json – Stores paths, camera settings, date format, etc.
 
----
+    db.py – Manages loading/saving students and logs.
 
-### 🔹 Statistikas funkcijas
-- [x] Saglabāt katru atpazīšanu `log.csv` ar laiku un skolēna ID
-- [x] Iegūt statistiku par parādīšanās biežumu
-- [ ] Izveidot grafikus ar `Matplotlib` (papildus iespēja)
+    recognition.py – Encodes and recognizes faces from the camera.
 
----
+    analytics.py – Processes and displays statistics.
 
-### 🔹 Lietotāja interfeiss (CLI)
-- [x] Izveidot vienkāršu izvēlni terminālī:
-  - [x] ✅ Atpazīt seju
-  - [x] ➕ Pievienot jaunu studentu
-  - [x] 📊 Apskatīt statistiku
-- [x] Validēt ievadītos datus (piemēram, vārda ievade)
+    app.py – Integrates everything into one application.
 
----
+    helpers.py – Contains utility functions: timestamps, file path operations, etc.
 
-### 🔹 Testēšana
-- [ ] Testēt ar vairākām sejām un attēliem
-- [ ] Simulēt kļūdas (piemēram, nav encodinga)
-- [ ] Testēt CSV failu bojājumus un atkopšanu
+✅ To-Do
+🔹 Project Start
 
----
+Create GitHub repository: FaceTrackEd
 
-### 🔹 Prezentācijai
-- [ ] Uztaisīt ekrānšāviņus: atpazīšana, kļūda, pievienošana
-- [ ] Aprakstīt projekta gaitu prezentācijā (PowerPoint vai PDF)
-- [ ] Izveidot demonstrācijas video vai ekrānuzņēmumu GIF
+Create README.md with problem description, goals, and plan.
+
+    Prepare test images (student faces).
+
+🔹 Data Structure and Class
+
+Create Student class with fields: id, name, encoding.
+
+Create students.csv file to store data.
+
+    Add the ability to save/load the encoding list from CSV.
+
+🔹 Face Recognition Functionality
+
+Load image or video.
+
+Recognize faces in the image with face_recognition.
+
+Compare with existing faces in the database.
+
+    Alert if face is unrecognized – offer to add.
+
+🔹 Statistics Functions
+
+Save each recognition in log.csv with time and student ID.
+
+Retrieve attendance frequency statistics.
+
+    Create graphs with Matplotlib (optional feature).
+
+🔹 User Interface (CLI)
+
+Create a simple menu in the terminal:
+
+✅ Face recognition
+
+➕ Add new student
+
+    📊 View statistics
+
+    Validate input data (e.g., name input).
+
+🔹 Testing
+
+Test with multiple faces and images.
+
+Simulate errors (e.g., missing encoding).
+
+    Test CSV file corruption and recovery.
 
