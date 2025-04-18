@@ -1,19 +1,45 @@
-//settings.json
-// {
-//   "csv_paths": {
-//     "students": "data/students.csv",
-//     "log": "data/log.csv"
-//   },
-//   "image_dir": "data/images",
-//   "recognition": {
-//     "tolerance": 0.6,
-//     "model": "hog"
-//   },
-//   "debug": true
-  
-// }
 {
-  "students_csv": "data/students.csv",
-  "log_csv": "data/log.csv",
-  "faces_dir": "data/faces/"
+  "file_paths": {
+    "students_csv": "data/students.csv",
+    "log_csv": "data/attendance_log.csv",
+    "faces_dir": "data/faces/"
+  },
+  "camera": {
+    "camera_id": 0,
+    "resolution": [640, 480],
+    "fps": 25,
+    "buffer_size": 2,
+    "flip_horizontal": false
+  },
+  "recognition": {
+    "model": "cnn",
+    "upsample_times": 1,
+    "jitter": 1,
+    "tolerance": 0.45
+  },
+  "performance": {
+    "scale_factor": 0.5,
+    "enable_motion_filter": false,
+    "motion_threshold": 1000,
+    "cache_size": 10,
+    "max_threads": 2
+  },
+  "logging": {
+    "log_file": "attendance_log.csv",
+    "min_log_interval": 5,
+    "log_resolution": false,
+    "log_emotions": false,
+    "log_timestamps": true
+  },
+  "UI": {
+    "box_color": [0, 255, 0],
+    "box_thickness": 2,
+    "font_scale": 0.5,
+    "text_color": [0, 255, 0]
+  },
+  "debug_settings": {
+    "show_confidence": true,
+    "highlight_unrecognized": true,
+    "log_processing_time": false 
+  }
 }
