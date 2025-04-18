@@ -80,20 +80,42 @@ Tradicionāla skolēnu uzskaite (piemēram, klases žurnālā vai manuāli atzī
 ## 📁 Struktūra (piemērs)
 
 FaceTrackEd/
-├── README.md               
-├── requirements.txt        
-├── config.py                
-│
+├── main.py                       # Точка входа в программу
+├── requirements.txt              # Зависимости проекта
+├── README.md                     # Документация проекта
+├── config/
+│   └── settings.json             # Настройки в формате JSON
+│   └── settings.py               # Класс загрузки настроек
 ├── data/
-│   └── atteli/             
-├── students.csv             
-├── log.csv                 
-│
-├── main.py                 
-├── face_module.py           
-├── db_module.py             
-├── stats_module.py          
-└── utils.py                 
+│   ├── students.csv              # База данных студентов
+│   ├── log.csv                   # Лог посещений
+│   └── faces/                    # Папка с изображениями лиц студентов
+├── app/
+│   ├── __init__.py
+│   ├── database/
+│   │   ├── __init__.py
+│   │   ├── db.py                 # Классы: StudentDatabase, AttendanceLogger
+│   ├── face/
+│   │   ├── __init__.py
+│   │   ├── recognition.py        # Класс: FaceRecognizer
+│   ├── stats/
+│   │   ├── __init__.py
+│   │   ├── analytics.py          # Класс: AttendanceStats
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── helpers.py            # Класс: TimeUtils и прочие утилиты
+│   └── core/
+│       ├── __init__.py
+│       ├── app.py                # Класс: FaceTrackApp — главный контроллер
+
+# Пояснение по файлам:
+# - main.py — запускает приложение, вызывает FaceTrackApp.run()
+# - settings.json — хранит пути, настройки камеры, формат даты и т.д.
+# - db.py — управляет загрузкой/сохранением студентов и логов
+# - recognition.py — кодирует и распознает лица с камеры
+# - analytics.py — обрабатывает и отображает статистику
+# - app.py — объединяет всё в единое приложение
+# - helpers.py — содержит утилиты: таймстемпы, работа с путями и т.д.
 
 
 ## ✅ To-Do
@@ -129,9 +151,9 @@ FaceTrackEd/
 
 ### 🔹 Lietotāja interfeiss (CLI)
 - [x] Izveidot vienkāršu izvēlni terminālī:
-  - [ ] ✅ Atpazīt seju
-  - [ ] ➕ Pievienot jaunu studentu
-  - [ ] 📊 Apskatīt statistiku
+  - [x] ✅ Atpazīt seju
+  - [x] ➕ Pievienot jaunu studentu
+  - [x] 📊 Apskatīt statistiku
 - [x] Validēt ievadītos datus (piemēram, vārda ievade)
 
 ---
