@@ -1,0 +1,19 @@
+//settings.json
+// {
+//   "csv_paths": {
+//     "students": "data/students.csv",
+//     "log": "data/log.csv"
+//   },
+//   "image_dir": "data/images",
+//   "recognition": {
+//     "tolerance": 0.6,
+//     "model": "hog"
+//   },
+//   "debug": true
+  
+// }
+{
+  "students_csv": "data/students.csv",
+  "log_csv": "data/log.csv",
+  "faces_dir": "data/faces/"
+}
