@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 from typing import Dict, Any, Optional
 
 class Settings:
@@ -25,7 +26,6 @@ class Settings:
         return value
 
     def _validate(self):
-        # Проверка обязательных путей
         required_paths = [
             ("file_paths.students_csv", str),
             ("file_paths.faces_dir", str)
@@ -36,13 +36,18 @@ class Settings:
                 raise ValueError(f"Настройка {key} отсутствует!")
             if isinstance(value, str) and not os.path.exists(value):
                 raise FileNotFoundError(f"Путь {value} не найден!")
-
-        # Проверка диапазонов
+        print(f"[INFO] All required files verified: {required_paths}")
         tolerance = self.get("recognition.tolerance")
         if not (0 <= tolerance <= 1):
             raise ValueError("tolerance должен быть между 0 и 1!")
+        print(f"[INFO] Recognition tolerance configured: {tolerance}")
+    
+
         
 if __name__ == '__main__':
     settings = Settings()
-    resolution = settings.get("camera.resolution", expected_type=tuple)  # (640, 480)
-    print(resolution)
+
+    print(settings.get("camera.resolution", expected_type=tuple))
+    print(settings.get("recognition.tolerance", expected_type=tuple))
+    settings.print_boot_info()
+    settings._validate()
