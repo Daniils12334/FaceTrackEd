@@ -8,25 +8,28 @@ from app.utils.helpers import TimeUtils
 
 class FaceTrackApp:
     def __init__(self):
-        self.settings = Settings()
-        self.face_recognizer = FaceRecognizer()
-        self.student_db = StudentDatabase(self.settings.get("file_paths.students_csv"))
+        self.settings = Settings() #Load config/settings files
+        self.config_path = self.settings.get("file_paths.settings_json")
+        self.student_db = StudentDatabase()
+        self.face_recognizer = FaceRecognizer(self.config_path)
         self.time_utils = TimeUtils
-        self.attendance_logger = AttendanceLogger(self.settings.get("file_paths.log_csv"))
+        self.attendance_logger = AttendanceLogger()
         self.stats = AttendanceStats()
 
     def run(self):
-        config_path = self.settings.get("file_paths.settings_json")
         faces_path = self.settings.get("file_paths.faces_dir")
-        db_path = self.settings.get("file_paths.students_csv")
+        db_path = self.student_db
         log_path = self.settings.get("file_paths.log_csv")
         tolerance = self.settings.get("recognition.tolerance")
         model = self.settings.get("recognition.model")
         self.time_utils.print_boot_info(
-            config_path=config_path,
+            config_path=self.config_path,
             faces_path=faces_path,
             db_path=db_path,
             log_path=log_path,
             tolerance=tolerance,
             model=model
         )
+
+        recognizer = FaceRecognizer(self.config_path)
+        recognizer.start_monitoring()

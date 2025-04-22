@@ -10,4 +10,5 @@ class AttendanceStats:
         self.log_file = self.settings.get("log_csv", "data/log.csv")
         self.time_utils = TimeUtils()
 
-    # ... методы класса ...
+    def generate_report(self):
+        pass

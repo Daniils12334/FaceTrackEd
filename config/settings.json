@@ -3,7 +3,8 @@
     "students_csv": "data/students.csv",
     "log_csv": "data/attendance_log.csv",
     "faces_dir": "data/faces/",
-    "settings_json": "config/settings.json"
+    "settings_json": "config/settings.json",
+    "demo_path": "data/assets/demo.mp4"
 
   },
   "camera": {
@@ -11,13 +12,18 @@
     "resolution": [640, 480],
     "fps": 25,
     "buffer_size": 2,
-    "flip_horizontal": false
+    "flip_horizontal": false,
+    "preferred_backend": "MSMF"
   },
   "recognition": {
-    "model": "cnn",
+    "model": "hog",
     "upsample_times": 1,
     "jitter": 1,
-    "tolerance": 0.45
+    "tolerance": 0.45,
+    "frame_rate": 5,
+    "skip_frames": 3,
+    "min_face_size": 50
+
   },
   "performance": {
     "scale_factor": 0.5,
@@ -42,6 +48,11 @@
   "debug_settings": {
     "show_confidence": true,
     "highlight_unrecognized": true,
-    "log_processing_time": false 
+    "log_processing_time": false, 
+    "show_fps": true,
+    "print_errors": true
+  },
+  "video": {
+    "loop_video": true
   }
 }
