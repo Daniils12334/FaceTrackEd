@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> a1c684e828263444813e080fc7f15b71a49cac0a
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as simpledialog
