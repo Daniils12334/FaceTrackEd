@@ -31,5 +31,11 @@ class FaceTrackApp:
             model=model
         )
 
+        # self.face_recognizer.enroll_new_user(
+        # name="Daniils Baranovs",
+        # student_id="130307-22796",
+        # num_samples=3
+        # )
+
         recognizer = FaceRecognizer(self.config_path)
         recognizer.start_monitoring()

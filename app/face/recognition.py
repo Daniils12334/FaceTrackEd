@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 import os
-from deepface import DeepFace
+from insightface.app import FaceAnalysis
 from config.settings import Settings
 from app.database.db import StudentDatabase, AttendanceLogger
 
@@ -15,7 +15,12 @@ class FaceRecognizer:
         self._load_student_data()
         from .camera import CameraManager  
         
-        # Initialize camera-related components
+        # Initialize face recognition model
+        self.model = FaceAnalysis(name='buffalo_l', 
+                                providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        self.model.prepare(ctx_id=0, det_size=(640, 640))
+
+        # Initialize camera components
         self.camera_manager = CameraManager()
         self.cap = None
 
@@ -24,164 +29,149 @@ class FaceRecognizer:
         self.frame_counter = 0
         self.last_logged = {}
         self.min_log_interval = self.settings.get("logging.min_log_interval", 60)
-        
-        # DeepFace configuration
-        self.detector_backend = self.settings.get("recognition.detector_backend", "opencv")
-        self.distance_metric = self.settings.get("recognition.distance_metric", "cosine")
-        self.model_name = self.settings.get("recognition.model_name", "VGG-Face")
-        self.threshold = self.settings.get("recognition.threshold", 0.6)
+        self.recognition_threshold = self.settings.get("recognition.tolerance", 0.6)
 
     def _load_student_data(self):
-        """Load student data from database and prepare for DeepFace"""
+        """Load student data from database and prepare for matching"""
         students = self.db.load_students()
-        self.known_encodings = [s.encoding for s in students]
+        self.known_embeddings = np.array([s.encoding for s in students])
         self.known_names = [s.name for s in students]
         self.known_ids = [s.student_id for s in students]
+
+    def enroll_new_user(self, name: str, student_id: str, image_path: str = None, num_samples: int = 5):
+        if image_path:
+            self._enroll_from_image(name, student_id, image_path)
+        else:
+            self._enroll_from_camera(name, student_id, num_samples)
+
+    def _enroll_from_image(self, name: str, student_id: str, image_path: str):
+        """Регистрация по существующему изображению"""
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file {image_path} not found")
+
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"Invalid image file: {image_path}")
+
+        self._process_and_save_face(name, student_id, img, image_path)
+
+    def _enroll_from_camera(self, name: str, student_id: str, num_samples: int):
+        """Регистрация через захват с камеры"""
+        print(f"Capture {num_samples} samples for {name}...")
+        cap = cv2.VideoCapture(0)
+        captured = 0
+        embeddings = []
         
-        # Convert encodings to numpy arrays if they aren't already
-        self.known_encodings = [np.array(enc) if not isinstance(enc, np.ndarray) else enc 
-                              for enc in self.known_encodings]
+        try:
+            while captured < num_samples:
+                ret, frame = cap.read()
+                if not ret:
+                    continue
+                
+                # Показать предпросмотр
+                cv2.imshow("Capture - Press SPACE to capture", frame)
+                key = cv2.waitKey(1)
+                
+                if key == 32:  # SPACE
+                    faces = self.model.get(frame)
+                    if len(faces) == 1:
+                        embedding = faces[0].embedding.tolist()
+                        embeddings.append(embedding)
+                        captured += 1
+                        print(f"Captured sample {captured}/{num_samples}")
+                    elif len(faces) > 1:
+                        print("Error: Multiple faces detected!")
+                    else:
+                        print("Error: No faces detected!")
+
+                elif key == 27:  # ESC
+                    break
+            
+            if len(embeddings) > 0:
+                # Сохраняем усредненный эмбеддинг
+                avg_embedding = np.mean(embeddings, axis=0).tolist()
+                image_path = f"data/students/{student_id}.jpg"
+                cv2.imwrite(image_path, frame)
+                self.db.add_student(name, student_id, image_path, avg_embedding)
+                print(f"Successfully enrolled {name}!")
+
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
+
+    def _process_and_save_face(self, name: str, student_id: str, image: np.ndarray, image_path: str):
+        """Обработка изображения и сохранение в базу"""
+        faces = self.model.get(image)
+        if len(faces) != 1:
+            raise ValueError(f"Found {len(faces)} faces. Need exactly 1 face for enrollment")
+
+        embedding = faces[0].embedding.tolist()
+        self.db.add_student(name, student_id, image_path, embedding)
+        self._load_student_data()  # Обновляем кэш
 
     def _recognize_faces(self, frame):
-        """Process frame for face recognition using DeepFace"""
-        try:
-            # Skip processing if not the target frame
-            self.frame_counter += 1
-            if self.frame_counter % self.process_every_n_frames != 0:
-                return [], []
+        """Process frame for face recognition using InsightFace"""
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        faces = self.model.get(rgb_frame)
+        
+        face_locations = []
+        names = []
+        recognized_data = []
 
-            # Convert to RGB (DeepFace expects RGB)
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Face detection and recognition
-            recognized_data = []
-            names = []
-            face_locations = []
-            
-            # Find faces in the frame
-            try:
-                face_objs = DeepFace.extract_faces(
-                    img_path=rgb_frame,
-                    target_size=(224, 224),
-                    detector_backend=self.detector_backend,
-                    enforce_detection=False,
-                    align=True
-                )
-            except Exception as e:
-                if self.debug_mode:
-                    print(f"Face detection error: {str(e)}")
-                return [], []
+        for face in faces:
+            # Convert bounding box to face_recognition format (top, right, bottom, left)
+            bbox = face.bbox.astype(int)
+            top, right, bottom, left = bbox[1], bbox[2], bbox[3], bbox[0]
+            face_locations.append((top, right, bottom, left))
 
-            for face_obj in face_objs:
-                if face_obj['confidence'] > 0.9:  # Only consider confident detections
-                    facial_area = face_obj['facial_area']
-                    face_location = (
-                        facial_area['y'],
-                        facial_area['x'] + facial_area['w'],
-                        facial_area['y'] + facial_area['h'],
-                        facial_area['x']
-                    )
-                    face_locations.append(face_location)
-                    
-                    # Get the face image
-                    face_img = face_obj['face']
-                    
-                    # Find the closest match in our database
-                    if self.known_encodings:
-                        try:
-                            # Compare against all known faces
-                            verification = DeepFace.verify(
-                                img1_path=face_img,
-                                img2_path=np.expand_dims(self.known_encodings[0], axis=0),  # Just for shape
-                                model_name=self.model_name,
-                                distance_metric=self.distance_metric,
-                                enforce_detection=False
-                            )
-                            
-                            # Custom comparison since DeepFace doesn't directly support our use case
-                            distances = []
-                            for known_enc in self.known_encodings:
-                                # Calculate distance manually
-                                if known_enc.shape == face_img.flatten().shape:
-                                    if self.distance_metric == "cosine":
-                                        dist = np.dot(face_img.flatten(), known_enc) / (
-                                            np.linalg.norm(face_img.flatten()) * np.linalg.norm(known_enc)
-                                        )
-                                        distances.append(1 - dist)  # Convert similarity to distance
-                                    else:  # euclidean
-                                        distances.append(np.linalg.norm(face_img.flatten() - known_enc))
-                            
-                            if distances:
-                                best_match_idx = np.argmin(distances)
-                                min_distance = distances[best_match_idx]
-                                
-                                if min_distance < self.threshold:
-                                    name = self.known_names[best_match_idx]
-                                    student_id = self.known_ids[best_match_idx]
-                                    names.append(name)
-                                    
-                                    # Log only if enough time has passed
-                                    current_time = time.time()
-                                    last_log = self.last_logged.get(student_id, 0)
-                                    if current_time - last_log >= self.min_log_interval:
-                                        recognized_data.append((name, student_id, True))
-                                        self.last_logged[student_id] = current_time
-                                else:
-                                    names.append("Unknown")
-                            else:
-                                names.append("Unknown")
-                        except Exception as e:
-                            if self.debug_mode:
-                                print(f"Face recognition error: {str(e)}")
-                            names.append("Unknown")
-                    else:
-                        names.append("Unknown")
+            if len(self.known_embeddings) == 0:
+                names.append("Unknown")
+                continue
 
-            if recognized_data and self.debug_mode:
-                print(f"Recognized: {recognized_data}")
+            # Calculate cosine similarity
+            embedding = face.embedding
+            similarities = np.dot(self.known_embeddings, embedding)
+            similarities /= np.linalg.norm(self.known_embeddings, axis=1) * np.linalg.norm(embedding)
+            best_match_idx = np.argmax(similarities)
+            max_similarity = similarities[best_match_idx]
 
-            if recognized_data:
-                self.log.log_attendance(recognized_data)
+            if max_similarity >= self.recognition_threshold:
+                name = self.known_names[best_match_idx]
+                student_id = self.known_ids[best_match_idx]
+                names.append(name)
 
-            return face_locations, names
+                # Attendance logging logic
+                current_time = time.time()
+                last_log = self.last_logged.get(student_id, 0)
+                if current_time - last_log >= self.min_log_interval:
+                    recognized_data.append((name, student_id, True))
+                    self.last_logged[student_id] = current_time
+            else:
+                names.append("Unknown")
 
-        except Exception as e:
-            if self.debug_mode:
-                print(f"Recognition error: {str(e)}")
-            return [], []
+        if self.debug_mode and recognized_data:
+            print(f"Recognized: {recognized_data}")
 
-    def _draw_recognitions(self, frame, face_locations, names):
-        """Draw bounding boxes and names on the frame"""
-        for (top, right, bottom, left), name in zip(face_locations, names):
-            # Draw bounding box
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-            
-            # Draw label
-            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 255, 0), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.8, (0, 0, 0), 1)
+        if recognized_data:
+            self.log.log_attendance(recognized_data)
+
+        return face_locations, names
 
     def start_monitoring(self):
-        """Main monitoring loop with fallback video sources"""
-        # Initialize camera
+        """Main monitoring loop with video source management"""
         self.cap = self.camera_manager.initialize_camera()
         
-        # If camera not available, offer alternative sources
         if not self.cap or not self.cap.isOpened():
             print("Primary video source not available")
-            if not self.camera_manager._identify_camera():  # Offer source selection
+            if not self.camera_manager._identify_camera():
                 print("No available video sources found. Exiting.")
                 return
-        
-        # Determine processing parameters
+
         is_video = self.camera_manager.is_video_source()
         frame_delay = int(1000 / self.cap.get(cv2.CAP_PROP_FPS)) if is_video else 1
-        
-        # Main processing loop
+
         while True:
             ret, frame = self.cap.read()
-            
-            # Handle video end/source loss
             if not ret:
                 if is_video and self.settings.get("video.loop_video", False):
                     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -189,20 +179,17 @@ class FaceRecognizer:
                 print("Video source ended or disconnected")
                 break
 
-            # Process every Nth frame
-            face_locations, names = self._recognize_faces(frame)
-            
-            # Draw recognition results
-            self._draw_recognitions(frame, face_locations, names)
+            self.frame_counter += 1
+            if self.frame_counter % self.process_every_n_frames == 0:
+                face_locations, names = self._recognize_faces(frame)
+                self.camera_manager._draw_recognitions(frame, face_locations, names)
 
-            # Display frame
             cv2.imshow('Face Recognition', frame)
-            
-            # Exit on 'q' key
             if cv2.waitKey(frame_delay) & 0xFF == ord('q'):
                 break
 
-        # Cleanup
         if self.cap and self.cap.isOpened():
             self.cap.release()
         cv2.destroyAllWindows()
+
+    # Keep other existing methods (process_frame, etc.) with minor adjustments as needed
