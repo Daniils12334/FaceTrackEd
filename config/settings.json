@@ -2,7 +2,7 @@
   "file_paths": {
     "students_csv": "data/students.csv",
     "log_csv": "data/attendance_log.csv",
-    "faces_dir": "data/faces/",
+    "students_images": "data/students/",
     "settings_json": "config/settings.json",
     "demo_path": "data/assets/demo.mp4"
 

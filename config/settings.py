@@ -28,7 +28,7 @@ class Settings:
     def _validate(self):
         required_paths = [
             ("file_paths.students_csv", str),
-            ("file_paths.faces_dir", str)
+            ("file_paths.students_images", str)
         ]
         for key, expected_type in required_paths:
             value = self.get(key, expected_type=expected_type)
