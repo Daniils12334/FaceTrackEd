@@ -8,21 +8,28 @@
 
   },
   "camera": {
-    "camera_id": 0,
+    "default_source": 0,
+    "fallback_sources": [0, 1],
     "resolution": [640, 480],
+    "loop_video": false,
+    "no_camera_image": "assets/no_camera.png",
     "fps": 25,
     "buffer_size": 2,
     "flip_horizontal": false,
     "preferred_backend": "MSMF"
   },
   "recognition": {
-    "model": "hog",
+    "model_name": "VGG-Face",
     "upsample_times": 1,
     "jitter": 1,
     "tolerance": 0.45,
+    "detector_backend": "opencv",
     "frame_rate": 5,
     "skip_frames": 3,
-    "min_face_size": 50
+    "distance_metric": "cosine",
+    "min_face_size": 50,
+    "min_log_interval": 5,
+    "threshold": 0.6
 
   },
   "performance": {
@@ -34,7 +41,6 @@
   },
   "logging": {
     "log_file": "attendance_log.csv",
-    "min_log_interval": 5,
     "log_resolution": false,
     "log_emotions": false,
     "log_timestamps": true

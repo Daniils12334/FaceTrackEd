@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import time
 import os
-import face_recognition
 from config.settings import Settings
 from app.database.db import StudentDatabase
 from .base_processor import BaseVideoProcessor
