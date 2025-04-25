@@ -1,11 +1,14 @@
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as simpledialog
-
+from app.face.recognition import FaceRecognizer
+from config.settings import Settings
 class App:
     def __init__(self, root):
         self.root = root
         self.camera_id = None
+        self.settings = Settings()
+        self.recognizer = FaceRecognizer()
 
         root.title("Match Selector")
         root.geometry("400x500")
@@ -13,13 +16,18 @@ class App:
         self.frm = ttk.Frame(root, padding=20)
         self.frm.grid()
 
-        # Buttons
-        for i in range(1, 6):
-            ttk.Button(self.frm, text=f"Match {i}", command=lambda i=i: getattr(self, f"match{i}")()).grid(column=0, row=i-1, pady=5)
 
-        ttk.Button(self.frm, text="Camera Config", command=self.match6).grid(column=0, row=5, pady=5)
+        button_width = 25  # Ширина всех кнопок
 
-        ttk.Button(self.frm, text="Quit", command=root.destroy).grid(column=0, row=6, pady=10)
+        ttk.Button(self.frm, text="Start monitoring", width=button_width, command=self.match1).grid(column=0, row=1, pady=5)
+        ttk.Button(self.frm, text="Start logging", width=button_width, command=self.match2).grid(column=0, row=2, pady=5)
+        ttk.Button(self.frm, text="Statistics", width=button_width, command=self.match3).grid(column=0, row=3, pady=5)
+        ttk.Button(self.frm, text="Start monitoring Heavy", width=button_width, command=self.match4).grid(column=0, row=4, pady=5)
+        ttk.Button(self.frm, text="Add Student", width=button_width, command=self.match5).grid(column=0, row=5, pady=5)
+        ttk.Button(self.frm, text="Camera Config", width=button_width, command=self.match6).grid(column=0, row=6, pady=5)
+        ttk.Button(self.frm, text="Manipulate Data", width=button_width, command=self._manipulate_data).grid(column=0, row=7, pady=5)
+        ttk.Button(self.frm, text="Quit", width=button_width, command=self.root.destroy).grid(column=0, row=8, pady=10)
+
 
         # Output log
         self.log = tk.Text(root, height=10, width=50)
@@ -34,12 +42,15 @@ class App:
 
     def match1(self): self.log_print("Match 1 selected")
     def match2(self): self.log_print("Match 2 selected")
-    def match3(self): self.log_print("Match 3 selected")
+    def match3(self): self._open_statistics_window()
     def match4(self): self.log_print("Match 4 selected")
     def match5(self): self.log_print("Match 5 selected")
     
     def match6(self):  # Open camera configuration window
         self._camera_config_window()
+
+    def _manipulate_data(self):
+        self.log_print("Manipulate Data button clicked")
 
     def _camera_config_window(self):
         win = tk.Toplevel(self.root)
@@ -108,6 +119,37 @@ class App:
         ttk.Button(win, text="6. Run diagnostics", command=diagnostics).pack(fill='x', pady=2)
         ttk.Button(win, text="7. Exit", command=win.destroy).pack(fill='x', pady=5)
 
+    def _open_statistics_window(self):
+        win = tk.Toplevel(self.root)
+        win.title("Statistics")
+        win.geometry("400x500")
+
+        local_log = tk.Text(win, height=10, width=50)
+        local_log.pack(pady=10)
+        local_log.insert(tk.END, "=== Statistics Panel ===\n")
+
+        def log_local(msg):
+            self.log_print(msg)
+            local_log.insert(tk.END, msg + "\n")
+            local_log.see(tk.END)
+
+        # Комбобоксы или кнопки для выбора
+        ttk.Label(win, text="Select Month:").pack()
+        ttk.Combobox(win, values=["January", "February", "March"]).pack(pady=2)
+
+        ttk.Label(win, text="Select Student:").pack()
+        ttk.Combobox(win, values=["All", "Alice", "Bob", "Charlie"]).pack(pady=2)
+
+        ttk.Label(win, text="Select Day:").pack()
+        ttk.Combobox(win, values=["All Days", "2025-04-20", "2025-04-21"]).pack(pady=2)
+
+        # Кнопки
+        ttk.Button(win, text="Show General Log", command=lambda: log_local("Showing full log...")).pack(fill='x', pady=2)
+        ttk.Button(win, text="Generate Graphs", command=lambda: log_local("Generating graphs...")).pack(fill='x', pady=2)
+
+        ttk.Button(win, text="Close", command=win.destroy).pack(fill='x', pady=5)
+
+
     # Stub methods
     def _list_available_cameras(self):
         return [0, 1]  # Example camera list
@@ -123,7 +165,3 @@ class App:
 
     def _run_camera_diagnostics(self):
         pass
-
-root = tk.Tk()
-app = App(root)
-root.mainloop()
