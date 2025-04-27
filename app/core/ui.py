@@ -40,12 +40,57 @@ class App:
         self.log.see(tk.END)
         print(msg)
 
-    def match1(self): self.log_print("Match 1 selected")
+    def match1(self): self.recognizer.start_monitoring()
     def match2(self): self.log_print("Match 2 selected")
     def match3(self): self._open_statistics_window()
     def match4(self): self.log_print("Match 4 selected")
-    def match5(self): self.log_print("Match 5 selected")
-    
+    def match5(self): self.open_enroll_window()
+
+    def open_enroll_window(self):
+        win = tk.Toplevel(self.root)
+        win.title("Enroll New Student")
+        win.geometry("300x300")
+
+        ttk.Label(win, text="Student Name:").pack(pady=5)
+        name_entry = ttk.Entry(win)
+        name_entry.pack(pady=5)
+
+        ttk.Label(win, text="Student ID:").pack(pady=5)
+        id_entry = ttk.Entry(win)
+        id_entry.pack(pady=5)
+
+        ttk.Label(win, text="Number of Samples:").pack(pady=5)
+        samples_entry = ttk.Entry(win)
+        samples_entry.pack(pady=5)
+        samples_entry.insert(0, "5")  # Стандартное значение
+
+        def enroll():
+            name = name_entry.get().strip()
+            student_id = id_entry.get().strip()
+            try:
+                num_samples = int(samples_entry.get())
+            except ValueError:
+                self.log_print("Error: Number of samples must be an integer.")
+                return
+            if not name or not student_id:
+                self.log_print("Error: Name and ID cannot be empty.")
+                return
+
+            self.log_print(f"Starting enrollment for {name} (ID: {student_id}) with {num_samples} samples.")
+            win.destroy()  # Сначала закрываем окно ввода
+            self.recognizer._enroll_from_camera(name, student_id, num_samples)  # Потом запускаем процесс регистрации
+
+        # Кнопки управления
+        button_frame = ttk.Frame(win)
+        button_frame.pack(pady=20)
+
+        start_button = ttk.Button(button_frame, text="Start Enrollment", command=enroll)
+        start_button.pack(side="left", padx=10)
+
+        cancel_button = ttk.Button(button_frame, text="Cancel", command=win.destroy)
+        cancel_button.pack(side="left", padx=10)
+
+        
     def match6(self):  # Open camera configuration window
         self._camera_config_window()
 
