@@ -1,1 +1,1 @@
-pip install pandas numpy opencv-python matplotlib insightface seaborn tk
+pip install pandas numpy opencv-python matplotlib seaborn tk torch onnxruntime scipy scikit-learn requests tqdm insightface
