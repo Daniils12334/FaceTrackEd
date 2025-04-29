@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 import os
+import threading
 from insightface.app import FaceAnalysis
 from config.settings import Settings
 from app.database.db import StudentDatabase, AttendanceLogger
@@ -15,21 +16,27 @@ class FaceRecognizer:
         self._load_student_data()
         from .camera import CameraManager  
         
-        # Initialize face recognition model
-        self.model = FaceAnalysis(name='buffalo_l', 
+        # Инициализация модели
+        self.model = FaceAnalysis(name='buffalo_sc', 
                                 providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-        self.model.prepare(ctx_id=0, det_size=(640, 640))
+        self.model.prepare(ctx_id=0, det_size=(640, 640))  # Уменьшаем размер для оптимизации
 
-        # Initialize camera components
+        # Компоненты камеры
         self.camera_manager = CameraManager()
         self.cap = None
 
-        # Recognition parameters
-        self.process_every_n_frames = self.settings.get("recognition.frame_rate", 5)
+        # Параметры распознавания
+        self.process_every_n_frames = self.settings.get("recognition.frame_rate", 30)
         self.frame_counter = 0
         self.last_logged = {}
         self.min_log_interval = self.settings.get("logging.min_log_interval", 60)
         self.recognition_threshold = self.settings.get("recognition.tolerance", 0.6)
+        
+        # Данные для синхронизации
+        self.lock = threading.Lock()
+        self.last_names = []
+        self.current_frame = None
+        self.processing_frame = None
 
     def _load_student_data(self):
         """Load student data from database and prepare for matching"""
@@ -109,26 +116,37 @@ class FaceRecognizer:
         self.db.add_student(name, student_id, image_path, embedding)
         self._load_student_data()  # Обновляем кэш
 
-    def _recognize_faces(self, frame):
-        """Process frame for face recognition using InsightFace"""
+    def _recognize_faces(self, frame, recognize_names=True):
+        """Обработка кадра с возможностью отключения распознавания имен"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         faces = self.model.get(rgb_frame)
         
         face_locations = []
-        names = []
-        recognized_data = []
-
         for face in faces:
-            # Convert bounding box to face_recognition format (top, right, bottom, left)
             bbox = face.bbox.astype(int)
-            top, right, bottom, left = bbox[1], bbox[2], bbox[3], bbox[0]
-            face_locations.append((top, right, bottom, left))
+            face_locations.append((bbox[1], bbox[2], bbox[3], bbox[0]))
 
-            if len(self.known_embeddings) == 0:
+        names = []
+        if recognize_names:
+            names = self._match_faces(faces)
+            with self.lock:
+                self.last_names = names
+        else:
+            with self.lock:
+                names = self.last_names[:len(faces)] if len(self.last_names) >= len(faces) else ["Unknown"]*len(faces)
+
+        return face_locations, names
+
+    def _match_faces(self, faces):
+        """Сопоставление лиц с базой данных"""
+        names = []
+        current_time = time.time()
+        
+        for face in faces:
+            if self.known_embeddings.size == 0:
                 names.append("Unknown")
                 continue
 
-            # Calculate cosine similarity
             embedding = face.embedding
             similarities = np.dot(self.known_embeddings, embedding)
             similarities /= np.linalg.norm(self.known_embeddings, axis=1) * np.linalg.norm(embedding)
@@ -140,56 +158,106 @@ class FaceRecognizer:
                 student_id = self.known_ids[best_match_idx]
                 names.append(name)
 
-                # Attendance logging logic
-                current_time = time.time()
+                # Логирование посещаемости
                 last_log = self.last_logged.get(student_id, 0)
                 if current_time - last_log >= self.min_log_interval:
-                    recognized_data.append((name, student_id, True))
+                    self.log.log_attendance([(name, student_id, True)])
                     self.last_logged[student_id] = current_time
             else:
                 names.append("Unknown")
-
-        if self.debug_mode and recognized_data:
-            print(f"Recognized: {recognized_data}")
-
-        if recognized_data:
-            self.log.log_attendance(recognized_data)
-
-        return face_locations, names
+        
+        return names
+    
+    def _preprocess_frame(self, frame):
+        """Улучшение качества изображения перед распознаванием"""
+        # Контрастирование
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        limg = cv2.merge((clahe.apply(l), a, b))
+        frame = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+        
+        # Шумоподавление
+        frame = cv2.fastNlMeansDenoisingColored(frame, None, 10, 10, 7, 21)
+        
+        return frame
 
     def start_monitoring(self):
-        """Main monitoring loop with video source management"""
+        """Основной цикл видео с разделением потоков"""
         self.cap = self.camera_manager.initialize_camera()
-        
         if not self.cap or not self.cap.isOpened():
-            print("Primary video source not available")
-            if not self.camera_manager._identify_camera():
-                print("No available video sources found. Exiting.")
-                return
+            print("[ERROR] Не удалось подключиться к источнику видео!")
+            return
 
-        is_video = self.camera_manager.is_video_source()
-        frame_delay = int(1000 / self.cap.get(cv2.CAP_PROP_FPS)) if is_video else 1
+        # Запуск потока распознавания
+        processing_thread = threading.Thread(target=self._async_recognition, daemon=True)
+        processing_thread.start()
+
+        print("[INFO] Запуск видеопотока...")
+        frame_timeout = 0
 
         while True:
             ret, frame = self.cap.read()
             if not ret:
-                if is_video and self.settings.get("video.loop_video", False):
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                print("Video source ended or disconnected")
+                print("[WARN] Проблема с получением кадра. Повторная попытка...")
+                frame_timeout += 1
+                if frame_timeout > 30:
+                    print("[ERROR] Не удалось восстановить соединение")
+                    break
+                time.sleep(1)
+                self.cap.release()
+                self.cap = self.camera_manager.initialize_camera()
+                continue
+            
+            frame_timeout = 0
+            
+            # Обновляем кадр для фоновой обработки
+            with self.lock:
+                self.current_frame = frame.copy()
+                fast_names = self.last_names.copy()
+
+            # Быстрая детекция лиц
+            try:
+                fast_locations, _ = self._recognize_faces(frame, recognize_names=False)
+                self.camera_manager._draw_recognitions(frame, fast_locations, [])
+                self.camera_manager._draw_recognitions(frame, fast_locations, fast_names)
+            except Exception as e:
+                print(f"[WARN] Ошибка отрисовки: {e}")
+
+            # Вывод кадра
+            try:
+                display_frame = cv2.resize(frame, (1280, 720))  # Масштабирование для отображения
+                cv2.imshow('Face Recognition', display_frame)
+            except Exception as e:
+                print(f"[ERROR] Ошибка отображения: {e}")
+
+            # Выход по 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-            self.frame_counter += 1
-            if self.frame_counter % self.process_every_n_frames == 0:
-                face_locations, names = self._recognize_faces(frame)
-                self.camera_manager._draw_recognitions(frame, face_locations, names)
-
-            cv2.imshow('Face Recognition', frame)
-            if cv2.waitKey(frame_delay) & 0xFF == ord('q'):
-                break
-
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
+        self.cap.release()
         cv2.destroyAllWindows()
 
-    # Keep other existing methods (process_frame, etc.) with minor adjustments as needed
+    def _async_recognition(self):
+        """Фоновая обработка — только обновление имен"""
+        print("[INFO] Фоновый поток распознавания запущен.")
+        while True:
+            time.sleep(0.05)
+
+            with self.lock:
+                if self.current_frame is None:
+                    continue
+                try:
+                    frame = self.current_frame.copy()
+                except:
+                    continue
+
+            if self.frame_counter % self.process_every_n_frames == 0:
+                try:
+                    _, names = self._recognize_faces(frame, recognize_names=True)
+                    if self.debug_mode:
+                        print(f"[DEBUG] Обновление имен: {names}")
+                except Exception as e:
+                    print(f"[ERROR] Распознавание не удалось: {e}")
+
+            self.frame_counter += 1
