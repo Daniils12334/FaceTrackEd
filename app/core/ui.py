@@ -41,7 +41,7 @@ class App:
         print(msg)
 
     def match1(self): self.recognizer.start_monitoring()
-    def match2(self): self.log_print("Match 2 selected")
+    def match2(self): self.recognizer.visualize_embeddings()
     def match3(self): self._open_statistics_window()
     def match4(self): self.log_print("Match 4 selected")
     def match5(self): self.open_enroll_window()

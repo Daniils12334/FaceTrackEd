@@ -20,7 +20,11 @@ class CameraManager:
         if not self.cap.isOpened():
             print("Primary camera not available")
             self._identify_camera()
-            
+            # Попробовать повторно открыть
+            self.cap = cv2.VideoCapture(self.camera_id)
+            if not self.cap.isOpened():
+                print("Ошибка: камера по-прежнему недоступна")
+        
         return self.cap
 
     def _list_available_cameras(self) -> list[int]:
@@ -61,7 +65,9 @@ class CameraManager:
         if not os.path.exists(video_path):
             print(f"Video file not found: {video_path}")
             return False
-            
+        if not self.cap or not self.cap.isOpened():
+            print("Ошибка: видео не открылось")
+            return False
         self.cap = cv2.VideoCapture(video_path)
         if self.cap.isOpened():
             print(f"Successfully loaded: {video_path}")
@@ -117,6 +123,25 @@ class CameraManager:
                         self.settings.get("UI.font_scale", 0.5),
                         text_color,
                         thickness)
+
+    def _draw_labels(self, frame, locations, names):
+        """Отрисовка только текстовых подписей"""
+        text_color = tuple(self.settings.get("UI.text_color", [255, 255, 255]))
+        font_scale = self.settings.get("UI.font_scale", 0.5)
+        thickness = self.settings.get("UI.box_thickness", 2)
+
+        for (top, right, bottom, left), name in zip(locations, names):
+            # Позиционирование текста
+            text_y = bottom + 20 if (bottom + 20) < frame.shape[0] else top - 10
+            cv2.putText(
+                frame,
+                name,
+                (left, text_y),
+                cv2.FONT_HERSHEY_DUPLEX,
+                font_scale,
+                text_color,
+                thickness
+            )
 
     def is_video_source(self) -> bool:
         """Check if current source is video file"""

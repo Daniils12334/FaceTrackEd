@@ -2,9 +2,13 @@ import cv2
 import numpy as np
 import time
 import os
+import threading
 from insightface.app import FaceAnalysis
 from config.settings import Settings
 from app.database.db import StudentDatabase, AttendanceLogger
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+
 
 class FaceRecognizer:
     def __init__(self, debug_mode=True):
@@ -12,31 +16,284 @@ class FaceRecognizer:
         self.log = AttendanceLogger()
         self.settings = Settings()
         self.debug_mode = debug_mode
+        self.last_detections = []  # Для временного сглаживания
         self._load_student_data()
-        from .camera import CameraManager  
         
-        # Initialize face recognition model
-        self.model = FaceAnalysis(name='buffalo_l', 
-                                providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-        self.model.prepare(ctx_id=0, det_size=(640, 640))
-
-        # Initialize camera components
-        self.camera_manager = CameraManager()
-        self.cap = None
-
-        # Recognition parameters
-        self.process_every_n_frames = self.settings.get("recognition.frame_rate", 5)
+        # Инициализация модели с улучшенными параметрами
+        gpu_providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        cpu_providers = ['CPUExecutionProvider']
+        
+        try:
+            self.model = FaceAnalysis(
+                name='buffalo_sc',
+                providers=gpu_providers
+            )
+            self.model.prepare(ctx_id=0, det_size=(640, 640))
+            print("Инициализация с GPU поддержкой")
+        except Exception as e:
+            print(f"Ошибка GPU: {e}, используется CPU")
+            self.model = FaceAnalysis(
+                name='buffalo_sc',
+                providers=cpu_providers
+            )
+            self.model.prepare(ctx_id=-1, det_size=(640, 640))
+        
+        # Проверка используемого устройства
+        from onnxruntime import get_device
+        print(f"Используемое устройство: {get_device()}")
+        
+        # Параметры распознавания
+        self.recognition_threshold = 0.7  # Базовый порог
+        self.det_thresh = 0.7  # Более низкий порог для большей чувствительности
+        self.track_thresh = 0.5  # Порог для трекинга
+        self.min_face_size = 150  # Минимальный размер лица в пикселях
+        self.process_every_n_frames = 5
         self.frame_counter = 0
         self.last_logged = {}
         self.min_log_interval = self.settings.get("logging.min_log_interval", 60)
-        self.recognition_threshold = self.settings.get("recognition.tolerance", 0.6)
+        self.last_time = time.time()  # Initialize last_time
+        
+        # Потокобезопасные переменные
+        self.lock = threading.Lock()
+        self.current_frame = None
+        self.last_names = []
+        self.last_locations = []
+
+
+    # В классе FaceRecognizer добавьте:
+    def visualize_embeddings(self):
+        """Визуализация эмбеддингов в 2D пространстве"""
+        tsne = TSNE(n_components=2)
+        embeddings_2d = tsne.fit_transform(self.known_embeddings)
+        
+        plt.figure(figsize=(10,8))
+        for i, name in enumerate(self.known_names):
+            plt.scatter(embeddings_2d[i,0], embeddings_2d[i,1], label=name)
+        
+        plt.legend()
+        plt.title("Визуализация эмбеддингов")
+        plt.show()
 
     def _load_student_data(self):
-        """Load student data from database and prepare for matching"""
         students = self.db.load_students()
+        if not students:
+            print("Внимание: база данных пуста!")
+            return
+        
         self.known_embeddings = np.array([s.encoding for s in students])
         self.known_names = [s.name for s in students]
         self.known_ids = [s.student_id for s in students]
+        
+        # Проверка качества эмбеддингов
+        norms = np.linalg.norm(self.known_embeddings, axis=1)
+        bad_samples = np.where((norms < 0.9) | (norms > 1.1))[0]
+        
+        if len(bad_samples) > 0:
+            print(f"Предупреждение: {len(bad_samples)} плохих эмбеддингов (норма: ~1.0)")
+            for idx in bad_samples:
+                print(f" - {self.known_names[idx]}: норма={norms[idx]:.4f}")
+
+    def _preprocess_frame(self, frame):
+        """Улучшение качества изображения"""
+        # CLAHE для контраста
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        limg = cv2.merge((clahe.apply(l), a, b))
+        frame = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+        
+        # Шумоподавление
+        frame = cv2.fastNlMeansDenoisingColored(frame, None, 10, 10, 7, 21)
+        return frame
+
+    def _match_faces(self, faces):
+        """Улучшенная версия с диагностикой"""
+        names = []
+        
+        if len(self.known_embeddings) == 0:
+            return ["Unknown"] * len(faces)
+        
+        for face in faces:
+            # Пропускаем лица низкого качества
+            if face.det_score < self.det_thresh:
+                names.append("Unknown")
+                continue
+                
+            embedding = face.embedding / np.linalg.norm(face.embedding)
+            
+            # Косинусная схожесть с нормализацией
+            similarities = np.dot(self.known_embeddings, embedding)
+            best_match_idx = np.argmax(similarities)
+            max_similarity = similarities[best_match_idx]
+            
+            # Динамический порог на основе качества лица
+            dynamic_thresh = max(self.recognition_threshold, 
+                            self.recognition_threshold * face.det_score)
+            
+            if max_similarity > dynamic_thresh:
+                name = self.known_names[best_match_idx]
+                names.append(name)
+                
+                # Диагностика (только в debug режиме)
+                if self.debug_mode and name == "Unknown":
+                    print(f"\nДиагностика Unknown:")
+                    print(f"Лучшее совпадение: {self.known_names[best_match_idx]}")
+                    print(f"Схожесть: {max_similarity:.4f} (порог: {dynamic_thresh:.4f})")
+                    print(f"Качество детекции: {face.det_score:.4f}")
+                    print(f"Углы поворота: {face.pose}")
+            else:
+                names.append("Unknown")
+        
+        return names
+
+    def _postprocess_results(self, locations, names):
+        """Фильтрация и сглаживание результатов"""
+        # Фильтр по размеру лица
+        valid_results = []
+        for (top, right, bottom, left), name in zip(locations, names):
+            face_size = (right - left) * (bottom - top)
+            if face_size > self.min_face_size:
+                valid_results.append(((top, right, bottom, left), name))
+        
+        # Временное сглаживание (по последним 5 кадрам)
+        self.last_detections.append(valid_results)
+        if len(self.last_detections) > 5:
+            self.last_detections.pop(0)
+        
+        # Голосование по последним кадрам
+        name_votes = {}
+        for frame_dets in self.last_detections:
+            for loc, name in frame_dets:
+                if name != "Unknown":
+                    name_votes[name] = name_votes.get(name, 0) + 1
+        
+        # Применение порога подтверждения
+        final_results = []
+        for (loc, name) in valid_results:
+            if name in name_votes and name_votes[name] >= 3:
+                final_results.append((loc, name))
+            else:
+                final_results.append((loc, "Unknown"))
+        
+        return zip(*final_results) if final_results else ([], [])
+
+    def _recognize_faces(self, frame, recognize_names=True):
+        """Обработка кадра с распознаванием"""
+        frame = self._preprocess_frame(frame)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        faces = self.model.get(rgb_frame)
+        
+        # Получение локаций лиц
+        locations = []
+        for face in faces:
+            bbox = face.bbox.astype(int)
+            locations.append((bbox[1], bbox[2], bbox[3], bbox[0]))
+        
+        # Распознавание имен (если требуется)
+        if recognize_names:
+            names = self._match_faces(faces)
+            locations, names = self._postprocess_results(locations, names)
+            with self.lock:
+                self.last_names = names
+                self.last_locations = locations
+        else:
+            with self.lock:
+                names = self.last_names
+                locations = self.last_locations
+        
+        return locations, names
+
+    def start_monitoring(self):
+        """Оптимизированный главный цикл с отрисовкой результатов"""
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        
+        # Warm-up модели
+        _ = self.model.get(np.zeros((640,640,3), dtype=np.uint8))
+        
+        # Поток обработки
+        processing_thread = threading.Thread(target=self._async_recognition, daemon=True)
+        processing_thread.start()
+        
+        last_time = time.time()
+        frame_count = 0
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret: break
+
+            # Уменьшенное изображение для анализа
+            small_frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5)
+
+            with self.lock:
+                self.current_frame = small_frame.copy()
+                locations = self.last_locations
+                names = self.last_names
+
+            # Масштабируем координаты обратно к оригинальному кадру
+            scaled_locations = [
+                (
+                    int(top * 2), int(right * 2),
+                    int(bottom * 2), int(left * 2)
+                )
+                for (top, right, bottom, left) in locations
+            ]
+
+            self._draw_results(frame, scaled_locations, names)
+
+            # Подсчёт FPS
+            frame_count += 1
+            if time.time() - last_time >= 1.0:
+                fps = frame_count / (time.time() - last_time)
+                print(f"FPS: {fps:.1f} | Распознавание: {self.process_every_n_frames}fps")
+                frame_count = 0
+                last_time = time.time()
+
+            cv2.imshow('Face Recognition', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+
+    def _async_recognition(self):
+        """Фоновый поток для распознавания"""
+        while True:
+            time.sleep(0.05)  # Оптимальная задержка
+            
+            with self.lock:
+                if self.current_frame is None:
+                    continue
+                frame = self.current_frame.copy()
+            
+            # Полное распознавание каждые N кадров
+            if self.frame_counter % self.process_every_n_frames == 0:
+                self._recognize_faces(frame, recognize_names=True)
+            
+            self.frame_counter += 1
+
+    def _draw_results(self, frame, locations, names):
+        """Отрисовка прямоугольников и имен"""
+        box_color = (0, 255, 0)
+        text_color = (255, 255, 255)
+        
+        for (top, right, bottom, left), name in zip(locations, names):
+            # Рисуем прямоугольник
+            cv2.rectangle(frame, (left, top), (right, bottom), box_color, 2)
+            
+            # Рисуем подпись
+            text_y = top - 10 if top - 10 > 10 else bottom + 20
+            cv2.putText(frame, name, (left, text_y), 
+                       cv2.FONT_HERSHEY_DUPLEX, 0.6, text_color, 1)
+            
+            if self.debug_mode:
+                fps_text = f"FPS: {1/(time.time()-self.last_time):.1f}" 
+                cv2.putText(frame, fps_text, (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+                self.last_time = time.time()
+
 
     def enroll_new_user(self, name: str, student_id: str, image_path: str = None, num_samples: int = 5):
         if image_path:
@@ -98,98 +355,3 @@ class FaceRecognizer:
         finally:
             cap.release()
             cv2.destroyAllWindows()
-
-    def _process_and_save_face(self, name: str, student_id: str, image: np.ndarray, image_path: str):
-        """Обработка изображения и сохранение в базу"""
-        faces = self.model.get(image)
-        if len(faces) != 1:
-            raise ValueError(f"Found {len(faces)} faces. Need exactly 1 face for enrollment")
-
-        embedding = faces[0].embedding.tolist()
-        self.db.add_student(name, student_id, image_path, embedding)
-        self._load_student_data()  # Обновляем кэш
-
-    def _recognize_faces(self, frame):
-        """Process frame for face recognition using InsightFace"""
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        faces = self.model.get(rgb_frame)
-        
-        face_locations = []
-        names = []
-        recognized_data = []
-
-        for face in faces:
-            # Convert bounding box to face_recognition format (top, right, bottom, left)
-            bbox = face.bbox.astype(int)
-            top, right, bottom, left = bbox[1], bbox[2], bbox[3], bbox[0]
-            face_locations.append((top, right, bottom, left))
-
-            if len(self.known_embeddings) == 0:
-                names.append("Unknown")
-                continue
-
-            # Calculate cosine similarity
-            embedding = face.embedding
-            similarities = np.dot(self.known_embeddings, embedding)
-            similarities /= np.linalg.norm(self.known_embeddings, axis=1) * np.linalg.norm(embedding)
-            best_match_idx = np.argmax(similarities)
-            max_similarity = similarities[best_match_idx]
-
-            if max_similarity >= self.recognition_threshold:
-                name = self.known_names[best_match_idx]
-                student_id = self.known_ids[best_match_idx]
-                names.append(name)
-
-                # Attendance logging logic
-                current_time = time.time()
-                last_log = self.last_logged.get(student_id, 0)
-                if current_time - last_log >= self.min_log_interval:
-                    recognized_data.append((name, student_id, True))
-                    self.last_logged[student_id] = current_time
-            else:
-                names.append("Unknown")
-
-        if self.debug_mode and recognized_data:
-            print(f"Recognized: {recognized_data}")
-
-        if recognized_data:
-            self.log.log_attendance(recognized_data)
-
-        return face_locations, names
-
-    def start_monitoring(self):
-        """Main monitoring loop with video source management"""
-        self.cap = self.camera_manager.initialize_camera()
-        
-        if not self.cap or not self.cap.isOpened():
-            print("Primary video source not available")
-            if not self.camera_manager._identify_camera():
-                print("No available video sources found. Exiting.")
-                return
-
-        is_video = self.camera_manager.is_video_source()
-        frame_delay = int(1000 / self.cap.get(cv2.CAP_PROP_FPS)) if is_video else 1
-
-        while True:
-            ret, frame = self.cap.read()
-            if not ret:
-                if is_video and self.settings.get("video.loop_video", False):
-                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                print("Video source ended or disconnected")
-                break
-
-            self.frame_counter += 1
-            if self.frame_counter % self.process_every_n_frames == 0:
-                face_locations, names = self._recognize_faces(frame)
-                self.camera_manager._draw_recognitions(frame, face_locations, names)
-
-            cv2.imshow('Face Recognition', frame)
-            if cv2.waitKey(frame_delay) & 0xFF == ord('q'):
-                break
-
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
-        cv2.destroyAllWindows()
-
-    # Keep other existing methods (process_frame, etc.) with minor adjustments as needed

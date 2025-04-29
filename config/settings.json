@@ -24,7 +24,7 @@
     "jitter": 1,
     "tolerance": 0.45,
     "detector_backend": "opencv",
-    "frame_rate": 5,
+    "frame_rate": 3,
     "skip_frames": 3,
     "distance_metric": "cosine",
     "min_face_size": 50,
