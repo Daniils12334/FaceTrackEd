@@ -16,6 +16,7 @@
 import sys
 import os
 from pathlib import Path
+from app.database.db import StudentDatabase
 from PyQt6 import QtWidgets, QtGui, QtCore
 import qtawesome as qta          # QtAwesome для иконок из FontAwesome (если нужны)
 import qdarkstyle                # Тёмная тема (QDarkStyleSheet) для приложения
@@ -29,6 +30,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setWindowTitle("FaceTrackEd")
         self.resize(800, 600)
+
+        self.db = StudentDatabase
 
         # Инициализация центрального виджета и макетов
         central_widget = QtWidgets.QWidget()
@@ -284,7 +287,7 @@ class StatsDialog(QtWidgets.QDialog):
         """Загружает и отображает статистику."""
         try:
             # Предполагается, что у recognizer есть метод get_statistics()
-            stats = self.recognizer.get_statistics()
+            stats = self.db.load_students()
             self.stats_text.setPlainText(str(stats))
         except Exception:
             # Временно: выводим заглушку
@@ -297,6 +300,7 @@ class DataDialog(QtWidgets.QDialog):
         self.recognizer = recognizer
         self.setWindowTitle("Управление данными")
         self.resize(500, 400)
+        self.db = StudentDatabase()
 
         layout = QtWidgets.QVBoxLayout(self)
 
@@ -319,21 +323,21 @@ class DataDialog(QtWidgets.QDialog):
         self.load_data()
 
     def load_data(self):
-        """Загружает данные из модуля recognizer в таблицу."""
+        """Загружает данные студентов из базы и отображает в таблице."""
         self.table.setRowCount(0)
         try:
-            # Предполагается, что у recognizer есть метод get_all_students()
-            students = self.recognizer.get_all_students()
-            for sid, name in students:
+            students = self.db.load_students()
+            for student in students:
                 row = self.table.rowCount()
                 self.table.insertRow(row)
-                self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(sid)))
-                self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(name))
-        except Exception:
-            # Если метод не реализован, добавляем заглушку
+                self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(student.student_id)))
+                self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(student.name))
+        except Exception as e:
+            print(f"Ошибка загрузки студентов: {e}")
             self.table.insertRow(0)
             self.table.setItem(0, 0, QtWidgets.QTableWidgetItem("123"))
             self.table.setItem(0, 1, QtWidgets.QTableWidgetItem("Иван Иванов"))
+
 
 # Пример использования (создание приложения и главного окна)
 if __name__ == "__main__":
