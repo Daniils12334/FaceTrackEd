@@ -130,6 +130,7 @@ class FaceRecognizer:
         self.log = AttendanceLogger()
         self.settings = Settings()
         self.debug_mode = debug_mode
+        self.cap = None
         
         # Система трекинга лиц
         self.face_tracker = FaceTracker(max_disappeared=10)
@@ -296,43 +297,44 @@ class FaceRecognizer:
 
     def start_monitoring(self):
         """Главный цикл обработки видео"""
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        
-        # Поток обработки
+        if not self.cap:
+            # По умолчанию — веб-камера
+            self.cap = cv2.VideoCapture(0)
+
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
         processing_thread = threading.Thread(target=self._process_frames, daemon=True)
         processing_thread.start()
-        
+
         last_time = time.time()
         fps_counter = 0
-        
+
         while True:
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
+                print("Кадр не получен, остановка.")
                 break
-            
-            # Обновление кадра для обработки
+
             with self.lock:
                 self.current_frame = frame.copy()
-            
-            # Отрисовка результатов
+
             self._draw_results(frame)
-            
-            # Подсчет FPS
+
             fps_counter += 1
             if time.time() - last_time >= 1.0:
                 fps = fps_counter / (time.time() - last_time)
                 print(f"FPS: {fps:.1f}")
                 fps_counter = 0
                 last_time = time.time()
-            
+
             cv2.imshow('Face Recognition', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-        
-        cap.release()
+
+        self.cap.release()
         cv2.destroyAllWindows()
+
 
     def _process_frames(self):
         """Фоновый поток обработки"""
@@ -405,7 +407,7 @@ class FaceRecognizer:
 
     # ... (остальные методы остаются без изменений)
 
-    def enroll_new_user(self, name: str, student_id: str, image_path: str = None, num_samples: int = 5):
+    def enroll_new_person(self, name: str, student_id: str, image_path: str = None, num_samples: int = 10):
         if image_path:
             self._enroll_from_image(name, student_id, image_path)
         else:

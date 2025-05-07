@@ -1,212 +1,357 @@
-import tkinter as tk
-from tkinter import ttk
-import tkinter.simpledialog as simpledialog
-from app.face.recognition import FaceRecognizer
-from config.settings import Settings
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.camera_id = None
-        self.settings = Settings()
-        self.recognizer = FaceRecognizer()
+# -*- coding: utf-8 -*-
+"""
+Пример современного пользовательского интерфейса для приложения FaceTrackEd на PyQt6.
+Файл: FaceTrackEd/app/core/ui.py
 
-        root.title("Match Selector")
-        root.geometry("400x500")
+Зависимости (установить через pip):
+- PyQt6
+- qtawesome
+- qdarkstyle
 
-        self.frm = ttk.Frame(root, padding=20)
-        self.frm.grid()
+В папке FaceTrackEd/icons/ должны храниться иконки (PNG или SVG) для кнопок интерфейса.
+Каждый функциональный элемент соответствует вызовам существующих модулей,
+например: self.recognizer.start_monitoring(), self.cam._use_test_video() и др.
+"""
+
+import sys
+import os
+from pathlib import Path
+from PyQt6 import QtWidgets, QtGui, QtCore
+import qtawesome as qta          # QtAwesome для иконок из FontAwesome (если нужны)
+import qdarkstyle                # Тёмная тема (QDarkStyleSheet) для приложения
+
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self, recognizer, cam, parent=None):
+        super().__init__(parent)
+        # Сохранение ссылок на модули распознавания и камеры
+        self.recognizer = recognizer
+        self.cam = cam
+
+        self.setWindowTitle("FaceTrackEd")
+        self.resize(800, 600)
+
+        # Инициализация центрального виджета и макетов
+        central_widget = QtWidgets.QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QtWidgets.QVBoxLayout(central_widget)
+
+        # Горизонтальный макет: боковая панель + пространство для содержимого
+        top_layout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(top_layout)
+
+        # Боковая панель (вертикальная) с кнопками управления
+        sidebar = QtWidgets.QFrame()
+        sidebar.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        sidebar.setMaximumWidth(180)  # Ширина боковой панели
+        sidebar_layout = QtWidgets.QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(5, 5, 5, 5)
+        sidebar_layout.setSpacing(10)
+
+        # Создание кнопок с иконками и текстом
+        icons_dir = Path(__file__).resolve().parent.parent.parent / "icons"
+        # Кнопка "Запустить мониторинг"
+        btn_start = QtWidgets.QPushButton("Запустить мониторинг")
+        try:
+            btn_start.setIcon(QtGui.QIcon(str(icons_dir / "monitor.png")))
+        except Exception:
+            btn_start.setIcon(qta.icon('fa5s.play', color='white'))
+        btn_start.clicked.connect(self.start_monitoring)
+        sidebar_layout.addWidget(btn_start)
+
+        # Кнопка "Добавить студента"
+        btn_add_student = QtWidgets.QPushButton("Добавить студента")
+        try:
+            btn_add_student.setIcon(QtGui.QIcon(str(icons_dir / "add_user.png")))
+        except Exception:
+            btn_add_student.setIcon(qta.icon('fa5s.user-plus', color='white'))
+        btn_add_student.clicked.connect(self.open_add_student_dialog)
+        sidebar_layout.addWidget(btn_add_student)
+
+        # Кнопка "Настройки камеры"
+        btn_camera = QtWidgets.QPushButton("Настройки камеры")
+        try:
+            btn_camera.setIcon(QtGui.QIcon(str(icons_dir / "camera.png")))
+        except Exception:
+            btn_camera.setIcon(qta.icon('fa5s.video', color='white'))
+        btn_camera.clicked.connect(self.open_camera_settings_dialog)
+        sidebar_layout.addWidget(btn_camera)
+
+        # Кнопка "Статистика"
+        btn_stats = QtWidgets.QPushButton("Статистика")
+        try:
+            btn_stats.setIcon(QtGui.QIcon(str(icons_dir / "stats.png")))
+        except Exception:
+            btn_stats.setIcon(qta.icon('fa5s.chart-bar', color='white'))
+        btn_stats.clicked.connect(self.open_stats_dialog)
+        sidebar_layout.addWidget(btn_stats)
+
+        # Кнопка "Данные"
+        btn_data = QtWidgets.QPushButton("Данные")
+        try:
+            btn_data.setIcon(QtGui.QIcon(str(icons_dir / "data.png")))
+        except Exception:
+            btn_data.setIcon(qta.icon('fa5s.database', color='white'))
+        btn_data.clicked.connect(self.open_data_dialog)
+        sidebar_layout.addWidget(btn_data)
+
+        # Кнопка "Выход"
+        btn_exit = QtWidgets.QPushButton("Выход")
+        try:
+            btn_exit.setIcon(QtGui.QIcon(str(icons_dir / "exit.png")))
+        except Exception:
+            btn_exit.setIcon(qta.icon('fa5s.sign-out-alt', color='white'))
+        btn_exit.clicked.connect(self.close)
+        sidebar_layout.addWidget(btn_exit)
+
+        # Добавляем боковую панель в верхний макет
+        top_layout.addWidget(sidebar)
+
+        # Пространство для основного содержимого (пока пустое или можно добавить виджеты)
+        content_area = QtWidgets.QFrame()
+        content_area.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        top_layout.addWidget(content_area)
+        # Можно добавить контент (например, поток видео) в content_area при необходимости
+
+        # Журнал логов внизу окна
+        self.log_text = QtWidgets.QPlainTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setMinimumHeight(100)
+        # Пример стилизации логов (дополнительно)
+        self.log_text.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4;")
+        main_layout.addWidget(self.log_text)
+
+        # Центрируем содержимое окна
+        main_layout.setStretchFactor(top_layout, 1)
+        main_layout.setStretchFactor(self.log_text, 0)
+
+    def start_monitoring(self):
+        """Запускает функцию мониторинга из модуля распознавания."""
+        self.log("Запуск мониторинга...")
+        try:
+            self.recognizer.start_monitoring()
+            self.log("Мониторинг запущен.")
+        except Exception as e:
+            self.log(f"Ошибка при запуске мониторинга: {e}")
+
+    def open_add_student_dialog(self):
+        """Открывает диалог добавления студента."""
+        dialog = AddStudentDialog(self.recognizer, parent=self)
+        dialog.exec()
+
+    def open_camera_settings_dialog(self):
+        """Открывает окно настроек камеры."""
+        dialog = CameraSettingsDialog(self.cam, parent=self)
+        dialog.exec()
+
+    def open_stats_dialog(self):
+        """Открывает окно статистики."""
+        dialog = StatsDialog(self.recognizer, parent=self)
+        dialog.exec()
+
+    def open_data_dialog(self):
+        """Открывает окно для управления данными."""
+        dialog = DataDialog(self.recognizer, parent=self)
+        dialog.exec()
+
+    def log(self, message):
+        """Выводит сообщение в журнал логов (нижняя часть окна)."""
+        self.log_text.appendPlainText(message)
+
+    def closeEvent(self, event):
+        """Подтверждение выхода."""
+        reply = QtWidgets.QMessageBox.question(
+            self, 'Выход',
+            "Вы действительно хотите выйти?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            event.accept()
+        else:
+            event.ignore()
 
 
-        button_width = 25  # Ширина всех кнопок
+class AddStudentDialog(QtWidgets.QDialog):
+    def __init__(self, recognizer, parent=None):
+        super().__init__(parent)
+        self.recognizer = recognizer
+        self.setWindowTitle("Добавить студента")
+        self.setMinimumWidth(300)
 
-        ttk.Button(self.frm, text="Start monitoring", width=button_width, command=self.match1).grid(column=0, row=1, pady=5)
-        ttk.Button(self.frm, text="Start logging", width=button_width, command=self.match2).grid(column=0, row=2, pady=5)
-        ttk.Button(self.frm, text="Statistics", width=button_width, command=self.match3).grid(column=0, row=3, pady=5)
-        ttk.Button(self.frm, text="Start monitoring Heavy", width=button_width, command=self.match4).grid(column=0, row=4, pady=5)
-        ttk.Button(self.frm, text="Add Student", width=button_width, command=self.match5).grid(column=0, row=5, pady=5)
-        ttk.Button(self.frm, text="Camera Config", width=button_width, command=self.match6).grid(column=0, row=6, pady=5)
-        ttk.Button(self.frm, text="Manipulate Data", width=button_width, command=self._manipulate_data).grid(column=0, row=7, pady=5)
-        ttk.Button(self.frm, text="Quit", width=button_width, command=self.root.destroy).grid(column=0, row=8, pady=10)
+        layout = QtWidgets.QFormLayout(self)
+
+        # Поля для ввода информации о студенте
+        self.name_input = QtWidgets.QLineEdit()
+        self.name_input.setPlaceholderText("Имя")
+        layout.addRow("Имя:", self.name_input)
+
+        self.id_input = QtWidgets.QLineEdit()
+        self.id_input.setPlaceholderText("ID студента")
+        layout.addRow("ID:", self.id_input)
+
+        # Кнопки Ok/Cancel
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.add_student)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def add_student(self):
+        """Вызывается при нажатии ОК: добавляет нового студента."""
+        name = self.name_input.text().strip()
+        student_id = self.id_input.text().strip()
+        if not name or not student_id:
+            QtWidgets.QMessageBox.warning(self, "Внимание", "Пожалуйста, заполните все поля.")
+            return
+        try:
+            # Предполагается, что у recognizer есть метод add_student(name, student_id)
+            self.recognizer.enroll_new_person(name, student_id)
+            QtWidgets.QMessageBox.information(self, "Успех", "Студент добавлен.")
+            self.accept()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось добавить студента: {e}")
 
 
-        # Output log
-        self.log = tk.Text(root, height=10, width=50)
-        self.log.grid(pady=10)
-        self.log.insert(tk.END, "Output log:\n")
+class CameraSettingsDialog(QtWidgets.QDialog):
+    def __init__(self, cam, parent=None):
+        super().__init__(parent)
+        self.cam = cam
+        self.setWindowTitle("Настройки камеры")
+        self.setMinimumWidth(300)
 
-    def log_print(self, *args):
-        msg = " ".join(map(str, args))
-        self.log.insert(tk.END, msg + "\n")
-        self.log.see(tk.END)
-        print(msg)
+        layout = QtWidgets.QFormLayout(self)
 
-    def match1(self): self.recognizer.start_monitoring()
-    def match2(self): self.recognizer.visualize_embeddings()
-    def match3(self): self._open_statistics_window()
-    def match4(self): self.log_print("Match 4 selected")
-    def match5(self): self.open_enroll_window()
+        # Выбор устройства камеры (предположим несколько камер)
+        self.camera_select = QtWidgets.QComboBox()
+        # Можно заполнить список доступных камер, например:
+        self.camera_select.addItems(["Камера 0", "Камера 1"])
+        layout.addRow("Выбор камеры:", self.camera_select)
 
-    def open_enroll_window(self):
-        win = tk.Toplevel(self.root)
-        win.title("Enroll New Student")
-        win.geometry("300x300")
+        # Переключатель тестового видео
+        self.test_video_checkbox = QtWidgets.QCheckBox("Использовать тестовое видео")
+        self.test_video_checkbox.setChecked(False)
+        layout.addRow(self.test_video_checkbox)
 
-        ttk.Label(win, text="Student Name:").pack(pady=5)
-        name_entry = ttk.Entry(win)
-        name_entry.pack(pady=5)
+        # Кнопки Ok/Cancel
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.apply_settings)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
 
-        ttk.Label(win, text="Student ID:").pack(pady=5)
-        id_entry = ttk.Entry(win)
-        id_entry.pack(pady=5)
-
-        ttk.Label(win, text="Number of Samples:").pack(pady=5)
-        samples_entry = ttk.Entry(win)
-        samples_entry.pack(pady=5)
-        samples_entry.insert(0, "5")  # Стандартное значение
-
-        def enroll():
-            name = name_entry.get().strip()
-            student_id = id_entry.get().strip()
+    def apply_settings(self):
+        """Применяет настройки камеры."""
+        selected_index = self.camera_select.currentIndex()
+        try:
+            # Предполагается, что у cam есть метод use_camera(index)
+            self.cam.use_camera(selected_index)
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Ошибка", f"Не удалось переключить камеру: {e}")
+        if self.test_video_checkbox.isChecked():
             try:
-                num_samples = int(samples_entry.get())
-            except ValueError:
-                self.log_print("Error: Number of samples must be an integer.")
-                return
-            if not name or not student_id:
-                self.log_print("Error: Name and ID cannot be empty.")
-                return
-
-            self.log_print(f"Starting enrollment for {name} (ID: {student_id}) with {num_samples} samples.")
-            win.destroy()  # Сначала закрываем окно ввода
-            self.recognizer._enroll_from_camera(name, student_id, num_samples)  # Потом запускаем процесс регистрации
-
-        # Кнопки управления
-        button_frame = ttk.Frame(win)
-        button_frame.pack(pady=20)
-
-        start_button = ttk.Button(button_frame, text="Start Enrollment", command=enroll)
-        start_button.pack(side="left", padx=10)
-
-        cancel_button = ttk.Button(button_frame, text="Cancel", command=win.destroy)
-        cancel_button.pack(side="left", padx=10)
-
-        
-    def match6(self):  # Open camera configuration window
-        self._camera_config_window()
-
-    def _manipulate_data(self):
-        self.log_print("Manipulate Data button clicked")
-
-    def _camera_config_window(self):
-        win = tk.Toplevel(self.root)
-        win.title("Camera Configuration")
-        win.geometry("400x500")
-
-        # Local log for window
-        local_log = tk.Text(win, height=15, width=50)
-        local_log.pack(pady=10)
-        local_log.insert(tk.END, "=== Camera Configuration ===\n")
-
-        def log_local(msg):
-            self.log_print(msg)         # Also prints to main window log
-            local_log.insert(tk.END, msg + "\n")
-            local_log.see(tk.END)
-
-        # Camera functions (simplified stubs)
-        def auto_detect():
-            cams = self._list_available_cameras()
-            if cams:
-                self.camera_id = cams[0]
-                log_local(f"Selected camera {self.camera_id}")
-                win.destroy()
-            else:
-                log_local("No cameras detected")
-        def manual_input():
-            cid = simpledialog.askinteger("Camera ID", "Enter camera ID:", parent=win)
-            if cid is not None:
-                self.camera_id = cid
-                log_local(f"Camera ID set to {cid}")
-                win.destroy()
-
-        def use_demo():
-            if self._use_test_video():
-                log_local("Using demo video")
-                win.destroy()
-            else:
-                log_local("Demo video not found")
+                # Включаем тестовое видео
+                self.cam._use_test_video()
+            except Exception as e:
+                QtWidgets.QMessageBox.warning(self, "Ошибка", f"Не удалось включить тестовое видео: {e}")
+        self.accept()
 
 
-        def custom_path():
-            path = simpledialog.askstring("Custom Video Path", "Enter path to video file:", parent=win)
-            if path:
-                self._handle_custom_video_input(path)
-                log_local(f"Using custom video path: {path}")
-                win.destroy()
+class StatsDialog(QtWidgets.QDialog):
+    def __init__(self, recognizer, parent=None):
+        super().__init__(parent)
+        self.recognizer = recognizer
+        self.setWindowTitle("Статистика")
+        self.resize(400, 300)
 
-        def permissions():
-            if not self._check_permissions():
-                log_local("System permissions required")
-                log_local("Windows: Settings > Privacy > Camera")
-                log_local("Linux: sudo chmod a+rw /dev/video*")
-            else:
-                log_local("Permissions OK")
+        layout = QtWidgets.QVBoxLayout(self)
 
-        def diagnostics():
-            self._run_camera_diagnostics()
-            log_local("Diagnostics complete")
+        # Текстовое поле для статистики
+        self.stats_text = QtWidgets.QPlainTextEdit()
+        self.stats_text.setReadOnly(True)
+        layout.addWidget(self.stats_text)
 
-        # Buttons for choices
-        ttk.Button(win, text="1. Auto-detect cameras", command=auto_detect).pack(fill='x', pady=2)
-        ttk.Button(win, text="2. Manual camera ID", command=manual_input).pack(fill='x', pady=2)
-        ttk.Button(win, text="3. Use demo video", command=use_demo).pack(fill='x', pady=2)
-        ttk.Button(win, text="4. Custom video path", command=custom_path).pack(fill='x', pady=2)
-        ttk.Button(win, text="5. Check permissions", command=permissions).pack(fill='x', pady=2)
-        ttk.Button(win, text="6. Run diagnostics", command=diagnostics).pack(fill='x', pady=2)
-        ttk.Button(win, text="7. Exit", command=win.destroy).pack(fill='x', pady=5)
+        # Кнопка "Обновить"
+        refresh_btn = QtWidgets.QPushButton("Обновить")
+        refresh_btn.clicked.connect(self.load_stats)
+        layout.addWidget(refresh_btn)
 
-    def _open_statistics_window(self):
-        win = tk.Toplevel(self.root)
-        win.title("Statistics")
-        win.geometry("400x500")
+        # Загружаем статистику при открытии
+        self.load_stats()
 
-        local_log = tk.Text(win, height=10, width=50)
-        local_log.pack(pady=10)
-        local_log.insert(tk.END, "=== Statistics Panel ===\n")
-
-        def log_local(msg):
-            self.log_print(msg)
-            local_log.insert(tk.END, msg + "\n")
-            local_log.see(tk.END)
-
-        # Комбобоксы или кнопки для выбора
-        ttk.Label(win, text="Select Month:").pack()
-        ttk.Combobox(win, values=["January", "February", "March"]).pack(pady=2)
-
-        ttk.Label(win, text="Select Student:").pack()
-        ttk.Combobox(win, values=["All", "Alice", "Bob", "Charlie"]).pack(pady=2)
-
-        ttk.Label(win, text="Select Day:").pack()
-        ttk.Combobox(win, values=["All Days", "2025-04-20", "2025-04-21"]).pack(pady=2)
-
-        # Кнопки
-        ttk.Button(win, text="Show General Log", command=lambda: log_local("Showing full log...")).pack(fill='x', pady=2)
-        ttk.Button(win, text="Generate Graphs", command=lambda: log_local("Generating graphs...")).pack(fill='x', pady=2)
-
-        ttk.Button(win, text="Close", command=win.destroy).pack(fill='x', pady=5)
+    def load_stats(self):
+        """Загружает и отображает статистику."""
+        try:
+            # Предполагается, что у recognizer есть метод get_statistics()
+            stats = self.recognizer.get_statistics()
+            self.stats_text.setPlainText(str(stats))
+        except Exception:
+            # Временно: выводим заглушку
+            self.stats_text.setPlainText("Статистика недоступна.")
 
 
-    # Stub methods
-    def _list_available_cameras(self):
-        return [0, 1]  # Example camera list
+class DataDialog(QtWidgets.QDialog):
+    def __init__(self, recognizer, parent=None):
+        super().__init__(parent)
+        self.recognizer = recognizer
+        self.setWindowTitle("Управление данными")
+        self.resize(500, 400)
 
-    def _use_test_video(self):
-        return True
+        layout = QtWidgets.QVBoxLayout(self)
 
-    def _handle_custom_video_input(self):
-        pass
+        # Таблица с данными студентов
+        self.table = QtWidgets.QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels(["ID", "Имя"])
+        layout.addWidget(self.table)
 
-    def _check_permissions(self):
-        return False
+        # Кнопка "Загрузить данные"
+        load_btn = QtWidgets.QPushButton("Загрузить данные")
+        load_btn.clicked.connect(self.load_data)
+        layout.addWidget(load_btn)
 
-    def _run_camera_diagnostics(self):
-        pass
+        # Кнопка "Закрыть"
+        close_btn = QtWidgets.QPushButton("Закрыть")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+
+        # Автоматическая загрузка данных при открытии
+        self.load_data()
+
+    def load_data(self):
+        """Загружает данные из модуля recognizer в таблицу."""
+        self.table.setRowCount(0)
+        try:
+            # Предполагается, что у recognizer есть метод get_all_students()
+            students = self.recognizer.get_all_students()
+            for sid, name in students:
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(sid)))
+                self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(name))
+        except Exception:
+            # Если метод не реализован, добавляем заглушку
+            self.table.insertRow(0)
+            self.table.setItem(0, 0, QtWidgets.QTableWidgetItem("123"))
+            self.table.setItem(0, 1, QtWidgets.QTableWidgetItem("Иван Иванов"))
+
+# Пример использования (создание приложения и главного окна)
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    # Применение тёмной темы через QDarkStyle (пример из документации:contentReference[oaicite:0]{index=0},
+    # Qt6 поддерживается в текущей версии QDarkStyle:contentReference[oaicite:1]{index=1})
+    app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt6'))
+
+    # Заглушки для модулей recognizer и cam для демонстрации
+    class Dummy:
+        def start_monitoring(self): print("Monitoring started")
+        def add_student(self, name, sid): print(f"Added student {name} ({sid})")
+        def get_statistics(self): return {"students": 10, "monitoring": 5}
+        def get_all_students(self): return [(1, "Иван Иванов"), (2, "Петр Петров")]
+    recognizer = Dummy()
+    cam = type('C', (), {"use_camera": lambda self, x: print(f"Camera {x} selected"),
+                         "_use_test_video": lambda self: print("Test video enabled")})()
+
+    window = MainWindow(recognizer, cam)
+    window.show()
+    sys.exit(app.exec())

@@ -1,1 +1,16 @@
-pip install pandas numpy opencv-python matplotlib seaborn tk torch onnxruntime scipy scikit-learn requests tqdm insightface
+pandas
+numpy
+opencv-python
+matplotlib
+seaborn
+tk
+torch
+onnxruntime
+scipy
+scikit-learn
+requests
+tqdm
+insightface
+PyQt6
+qdarkstyle
+qtawesome

@@ -57,22 +57,24 @@ class CameraManager:
             return False
         except:
             return False
-
     def _use_test_video(self, video_path: str = None):
         """Handle test video input"""
         video_path = video_path or self.demo_video
-        
+
         if not os.path.exists(video_path):
             print(f"Video file not found: {video_path}")
             return False
-        if not self.cap or not self.cap.isOpened():
-            print("Ошибка: видео не открылось")
-            return False
+
         self.cap = cv2.VideoCapture(video_path)
+
         if self.cap.isOpened():
-            print(f"Successfully loaded: {video_path}")
+            print(f"Тестовое видео загружено: {video_path}")
             return True
+
+        print("Ошибка: видео не открылось")
         return False
+
+
 
     def _handle_custom_video_input(self):
         """Handle custom video path input"""
@@ -160,54 +162,6 @@ class CameraManager:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-    def _identify_camera(self):
-        """Camera configuration interface"""
-        print("\n=== Camera Configuration ===")
-        print("1. Auto-detect cameras")
-        print("2. Manual camera ID")
-        print("3. Use default demo video")
-        print("4. Enter custom video path")
-        print("5. Check permissions")
-        print("6. Run diagnostics")
-        print("7. Exit")
-        
-        while True:
-            choice = input("Select action: ")
-            
-            match choice:
-                case "1":
-                    if cams := self._list_available_cameras():
-                        self.camera_id = cams[0]
-                        print(f"Selected camera {self.camera_id}")
-                        return
-                    print("No cameras detected")
-                    
-                case "2":
-                    self.camera_id = int(input("Enter camera ID: "))
-                    return
-                    
-                case "3":
-                    if self._use_test_video():
-                        return
-                        
-                case "4":
-                    self._handle_custom_video_input()
-                    return
-                    
-                case "5":
-                    if not self._check_permissions():
-                        print("System permissions required")
-                        print("Windows: Settings > Privacy > Camera")
-                        print("Linux: sudo chmod a+rw /dev/video*")
-                        
-                case "6":
-                    self._run_camera_diagnostics()
-                    
-                case "7":
-                    exit()
-                    
-                case _:
-                    print("Invalid selection")
 
     
 
