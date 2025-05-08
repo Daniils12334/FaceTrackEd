@@ -1,5 +1,5 @@
 from config.settings import Settings
-from app.face.recognition import FaceRecognizer
+from app.face.recognition_deepface import FaceRecognizer
 from app.database.db import StudentDatabase, AttendanceLogger
 from app.stats.analytics import AttendanceStats
 from app.utils.helpers import TimeUtils

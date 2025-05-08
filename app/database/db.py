@@ -24,7 +24,8 @@ class StudentDatabase:
                     student = Student(
                         student_id=row['student_id'],
                         name=row['name'],
-                        encoding=encoding
+                        encoding=encoding,
+                        image_path=row['image_path']
                     )
                     students.append(student)
                     print(f"Loaded: {student.name}, shape: {student.encoding.shape}")

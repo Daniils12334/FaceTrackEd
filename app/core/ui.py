@@ -12,10 +12,11 @@
 Каждый функциональный элемент соответствует вызовам существующих модулей,
 например: self.recognizer.start_monitoring(), self.cam._use_test_video() и др.
 """
-
+import threading
 import sys
 import os
 from pathlib import Path
+from app.face.recognition_deepface import FaceRecognizer
 from app.database.db import StudentDatabase
 from PyQt6 import QtWidgets, QtGui, QtCore
 import qtawesome as qta          # QtAwesome для иконок из FontAwesome (если нужны)
@@ -25,7 +26,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, recognizer, cam, parent=None):
         super().__init__(parent)
         # Сохранение ссылок на модули распознавания и камеры
-        self.recognizer = recognizer
+        self.recognizer = FaceRecognizer()
         self.cam = cam
 
         self.setWindowTitle("FaceTrackEd")
@@ -135,6 +136,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.log("Мониторинг запущен.")
         except Exception as e:
             self.log(f"Ошибка при запуске мониторинга: {e}")
+        recognizer = FaceRecognizer()
+        t = threading.Thread(target=recognizer.start_monitoring)
+        t.daemon = True
+        t.start()
 
     def open_add_student_dialog(self):
         """Открывает диалог добавления студента."""
