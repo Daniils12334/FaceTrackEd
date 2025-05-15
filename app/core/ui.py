@@ -13,10 +13,12 @@
 например: self.recognizer.start_monitoring(), self.cam._use_test_video() и др.
 """
 
+
 import sys
 import os
 from pathlib import Path
 from app.database.db import StudentDatabase
+from app.face.recognition import FaceRecognizer
 from PyQt6 import QtWidgets, QtGui, QtCore
 import qtawesome as qta          # QtAwesome для иконок из FontAwesome (если нужны)
 import qdarkstyle                # Тёмная тема (QDarkStyleSheet) для приложения
@@ -60,6 +62,14 @@ class MainWindow(QtWidgets.QMainWindow):
             btn_start.setIcon(qta.icon('fa5s.play', color='white'))
         btn_start.clicked.connect(self.start_monitoring)
         sidebar_layout.addWidget(btn_start)
+
+        btn_video = QtWidgets.QPushButton("Мониторинг из видео")
+        try:
+            btn_video.setIcon(QtGui.QIcon(str(icons_dir / "video.png")))
+        except Exception:
+            btn_video.setIcon(qta.icon('fa5s.video', color='white'))
+        btn_video.clicked.connect(self.start_video_monitoring)
+        sidebar_layout.insertWidget(1, btn_video)  # Добавляем после кнопки "Запустить мониторин
 
         # Кнопка "Добавить студента"
         btn_add_student = QtWidgets.QPushButton("Добавить студента")
@@ -127,6 +137,29 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setStretchFactor(top_layout, 1)
         main_layout.setStretchFactor(self.log_text, 0)
 
+    def start_video_monitoring(self):
+        """Запускает мониторинг из выбранного видеофайла"""
+        # Диалог выбора файла
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Выберите видеофайл",
+            "",
+            "Видео файлы (*.mp4 *.avi *.mov);;Все файлы (*)"
+        )
+        
+        if file_path:
+            self.log(f"Запуск мониторинга из видео: {file_path}")
+            try:
+                self.recognizer.test_video_processing(file_path)
+                self.log("Мониторинг видео запущен")
+            except Exception as e:
+                self.log(f"Ошибка при запуске мониторинга: {str(e)}")
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Ошибка",
+                    f"Не удалось запустить мониторинг из видео:\n{str(e)}"
+                )
+
     def start_monitoring(self):
         """Запускает функцию мониторинга из модуля распознавания."""
         self.log("Запуск мониторинга...")
@@ -175,46 +208,151 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 class AddStudentDialog(QtWidgets.QDialog):
-    def __init__(self, recognizer, parent=None):
+    def __init__(self, recognizer=FaceRecognizer(), parent=None):
         super().__init__(parent)
         self.recognizer = recognizer
+        self.setup_ui()
+
+    def setup_ui(self):
         self.setWindowTitle("Добавить студента")
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(400)
 
         layout = QtWidgets.QFormLayout(self)
 
-        # Поля для ввода информации о студенте
+        # Основные поля
         self.name_input = QtWidgets.QLineEdit()
-        self.name_input.setPlaceholderText("Имя")
-        layout.addRow("Имя:", self.name_input)
-
         self.id_input = QtWidgets.QLineEdit()
-        self.id_input.setPlaceholderText("ID студента")
+        layout.addRow("Имя:", self.name_input)
         layout.addRow("ID:", self.id_input)
 
-        # Кнопки Ok/Cancel
+        # Выбор источника данных
+        self.source_combo = QtWidgets.QComboBox()
+        self.source_combo.addItems(["С камеры", "Из изображения", "Из видео"])
+        self.source_combo.currentIndexChanged.connect(self.update_source_controls)
+        layout.addRow("Источник:", self.source_combo)
+
+        # Динамическая область
+        self.dynamic_container = QtWidgets.QWidget()
+        self.dynamic_layout = QtWidgets.QHBoxLayout(self.dynamic_container)
+        self.dynamic_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addRow(self.dynamic_container)
+
+        # Создаем все возможные виджеты заранее
+        self.setup_dynamic_widgets()
+        
+        # Кнопки
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | 
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
-        buttons.accepted.connect(self.add_student)
+        buttons.accepted.connect(self.process_enrollment)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def add_student(self):
-        """Вызывается при нажатии ОК: добавляет нового студента."""
+    def setup_dynamic_widgets(self):
+        """Создает все виджеты для динамической области заранее"""
+        # Виджет для количества образцов
+        self.sample_label = QtWidgets.QLabel("Количество образцов:")
+        self.sample_spin = QtWidgets.QSpinBox()
+        self.sample_spin.setRange(1, 50)
+        self.sample_spin.setValue(10)
+
+        # Виджеты для выбора файла
+        self.file_path = QtWidgets.QLineEdit()
+        self.file_path.setReadOnly(True)
+        self.browse_btn = QtWidgets.QPushButton("Обзор...")
+        self.browse_btn.clicked.connect(self.browse_file)
+
+        # Изначально скрываем все
+        for widget in [self.sample_label, self.sample_spin, self.file_path, self.browse_btn]:
+            widget.setVisible(False)
+
+    def update_source_controls(self):
+        """Обновляет видимые элементы в зависимости от выбранного источника"""
+        # Сначала скрываем все виджеты
+        for widget in [self.sample_label, self.sample_spin, self.file_path, self.browse_btn]:
+            widget.setVisible(False)
+
+        # Очищаем layout (но не удаляем виджеты)
+        while self.dynamic_layout.count():
+            item = self.dynamic_layout.takeAt(0)
+
+        source_type = self.source_combo.currentText()
+        
+        if source_type == "С камеры":
+            self.dynamic_layout.addWidget(self.sample_label)
+            self.dynamic_layout.addWidget(self.sample_spin)
+            self.sample_label.setVisible(True)
+            self.sample_spin.setVisible(True)
+            
+        elif source_type == "Из изображения":
+            self.dynamic_layout.addWidget(self.file_path)
+            self.dynamic_layout.addWidget(self.browse_btn)
+            self.file_path.setVisible(True)
+            self.browse_btn.setVisible(True)
+            
+        elif source_type == "Из видео":
+            self.dynamic_layout.addWidget(self.file_path)
+            self.dynamic_layout.addWidget(self.browse_btn)
+            self.dynamic_layout.addWidget(self.sample_label)
+            self.dynamic_layout.addWidget(self.sample_spin)
+            self.file_path.setVisible(True)
+            self.browse_btn.setVisible(True)
+            self.sample_label.setVisible(True)
+            self.sample_spin.setVisible(True)
+
+    def browse_file(self):
+        """Открывает диалог выбора файла"""
+        source_type = self.source_combo.currentText()
+        filters = "Images (*.png *.jpg *.jpeg)" if source_type == "Из изображения" else "Videos (*.mp4 *.avi *.mov)"
+        
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, 
+            f"Выберите {'фото' if source_type == 'Из изображения' else 'видео'}", 
+            "", 
+            filters
+        )
+        
+        if path:
+            self.file_path.setText(path)
+
+    def process_enrollment(self):
+        """Обрабатывает добавление студента"""
         name = self.name_input.text().strip()
         student_id = self.id_input.text().strip()
+        
         if not name or not student_id:
-            QtWidgets.QMessageBox.warning(self, "Внимание", "Пожалуйста, заполните все поля.")
+            QtWidgets.QMessageBox.warning(self, "Ошибка", "Заполните имя и ID")
             return
+
         try:
-            # Предполагается, что у recognizer есть метод add_student(name, student_id)
-            self.recognizer.enroll_new_person(name, student_id)
-            QtWidgets.QMessageBox.information(self, "Успех", "Студент добавлен.")
+            source_type = self.source_combo.currentText()
+            
+            if source_type == "С камеры":
+                self.recognizer.enroll_new_person(
+                    name, student_id, 
+                    num_samples=self.sample_spin.value()
+                )
+            elif source_type == "Из изображения":
+                if not self.file_path.text():
+                    raise ValueError("Не выбрано изображение")
+                self.recognizer.enroll_new_person(
+                    name, student_id, 
+                    self.file_path.text()
+                )
+            elif source_type == "Из видео":
+                if not self.file_path.text():
+                    raise ValueError("Не выбрано видео")
+                self.recognizer.enroll_new_person(
+                    name, student_id, 
+                    self.file_path.text(),
+                    num_samples=self.sample_spin.value()
+                )
+            
+            QtWidgets.QMessageBox.information(self, "Успех", "Студент добавлен")
             self.accept()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось добавить студента: {e}")
-
+            QtWidgets.QMessageBox.critical(self, "Ошибка", f"Не удалось добавить: {str(e)}")
 
 class CameraSettingsDialog(QtWidgets.QDialog):
     def __init__(self, cam, parent=None):
