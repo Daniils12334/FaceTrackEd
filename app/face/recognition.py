@@ -8,7 +8,9 @@ from insightface.app import FaceAnalysis
 from config.settings import Settings
 from app.database.db import StudentDatabase, AttendanceLogger
 from sklearn.metrics.pairwise import cosine_similarity
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.info("Created By Daniils Baranovs")
 class FaceTracker:
     def __init__(self, max_disappeared=5):
         self.next_id = 0
@@ -121,16 +123,17 @@ class FaceTracker:
                 }
                 matches[face_id] = i
                 self.next_id += 1
-
+        if face_id in self.confirmed_ids:
+            self.confirmed_ids.remove(face_id)
         return {face_id: current_locations[face_idx] for face_id, face_idx in matches.items()}
 
 class FaceRecognizer:
     def __init__(self, debug_mode=True):
         self.db = StudentDatabase()
-        self.log = AttendanceLogger()
         self.settings = Settings()
         self.debug_mode = debug_mode
         self.cap = None
+        self.running = True
         
         # Система трекинга лиц
         self.face_tracker = FaceTracker(max_disappeared=10)
@@ -161,6 +164,8 @@ class FaceRecognizer:
         self.last_results = []
         self.confirmed_ids = set()  # ID подтвержденных лиц
         self.max_votes = 10  # Максимальное количество голосов
+
+        self.logger = AttendanceLogger()
 
     def _initialize_model(self):
         """Инициализация модели с автоматическим выбором провайдера"""
@@ -243,6 +248,9 @@ class FaceRecognizer:
 
         # Собираем результаты с учетом трекеров
         final_results = []
+        logged_students = set()  # Для предотвращения дублирования в текущем кадре
+        current_time = time.time()
+        
         for face_id, loc in tracked_faces.items():
             try:
                 idx = locations.index(loc)
@@ -291,6 +299,27 @@ class FaceRecognizer:
                     final_name = best_name
                     self.confirmed_ids.add(face_id)  # Фиксируем подтвержденное лицо
 
+                    # Логирование посещаемости с защитой от спама
+                    if final_name != "Unknown":
+                        try:
+                            student_idx = self.known_names.index(final_name)
+                            student_id = self.known_ids[student_idx]
+                            
+                            # Проверяем время последней регистрации
+                            last_logged = self.logger._recent_log_cache.get(student_id, 0)
+                            if (current_time - last_logged) > 600:  # 10 минут в секундах
+                                self.logger.log_attendance([{
+                                    'student_id': student_id,
+                                    'name': final_name
+                                }])
+                                # Обновляем кеш чтобы предотвратить спам
+                                self.logger._recent_log_cache[student_id] = current_time
+                                logged_students.add(student_id)
+                        except ValueError as e:
+                            logging.error(f"Student {final_name} not in database: {e}")
+                        except Exception as e:
+                            logging.error(f"Error logging attendance: {e}")
+
             final_results.append((loc, final_name, face_id))
         
         return final_results
@@ -338,7 +367,7 @@ class FaceRecognizer:
 
     def _process_frames(self):
         """Фоновый поток обработки"""
-        while True:
+        while self.running == True:
             time.sleep(0.05)
             
             with self.lock:
@@ -405,13 +434,107 @@ class FaceRecognizer:
                                    (left, text_y + 25),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
 
-    # ... (остальные методы остаются без изменений)
+    def enroll_new_person(self, name: str, student_id: str, num_samples: int = 5):
+        """Enroll a new person using webcam with visual feedback"""
+        cap = cv2.VideoCapture(0)
+        collected_embeddings = []
+        enrollment_images = []
+        face_count = 0
+        sample_count = 0
+        last_capture = time.time()
+        
+        # Create output directory if needed
+        os.makedirs("enrollment_images", exist_ok=True)
 
-    def enroll_new_person(self, name: str, student_id: str, image_path: str = None, num_samples: int = 10):
-        if image_path:
-            self._enroll_from_image(name, student_id, image_path)
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                continue
+
+            # Mirror the frame for more natural interaction
+            frame = cv2.flip(frame, 1)
+            display_frame = frame.copy()
+            
+            # Face detection
+            faces = self.model.get(frame)
+            valid_face = False
+
+            if len(faces) == 1:
+                face = faces[0]
+                if face.det_score > self.det_thresh:
+                    # Get face bounding box
+                    bbox = face.bbox.astype(int)
+                    valid_face = True
+                    
+                    # Show countdown timer
+                    elapsed = time.time() - last_capture
+                    if elapsed > 2 and sample_count < num_samples:
+                        cv2.putText(display_frame, f"Capturing sample {sample_count+1}/{num_samples}", 
+                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.rectangle(display_frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), 
+                                    (0, 255, 0), 2)
+                        
+                        # Capture sample every 2 seconds
+                        if elapsed > 3:
+                            # Save image and embedding
+                            face_img = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+                            if face_img.size > 0:
+                                enrollment_images.append(face_img)
+                                collected_embeddings.append(face.embedding)
+                                sample_count += 1
+                                last_capture = time.time()
+                                
+                                # Save sample image
+                                img_path = f"enrollment_images/{student_id}_{sample_count}.jpg"
+                                cv2.imwrite(img_path, face_img)
+            elif len(faces) > 1:
+                cv2.putText(display_frame, "Multiple faces detected!", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+            # Display instructions
+            cv2.putText(display_frame, f"Enrolling: {name} ({student_id})", (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(display_frame, "Press SPACE to start/continue, Q to cancel", (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 255), 1)
+            
+            # Show progress
+            cv2.rectangle(display_frame, (10, 100), (10 + (sample_count * 50), 120), 
+                        (0, 255, 0), -1)
+            
+            cv2.imshow("Enrollment", display_frame)
+            
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                break
+            elif key == ord(' ') and valid_face:
+                # Start/continue enrollment when space pressed with valid face
+                if sample_count < num_samples:
+                    last_capture = time.time() - 2  # Force immediate capture
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+        if sample_count >= num_samples and collected_embeddings:
+            # Average embeddings for better accuracy
+            avg_embedding = np.mean(collected_embeddings, axis=0).tolist()
+            
+            # Save to database
+            try:
+                self.db.add_student(
+                    name=name,
+                    student_id=student_id,
+                    image_path=f"enrollment_images/{student_id}_1.jpg",  # Save first sample
+                    embedding=avg_embedding
+                )
+                self._load_student_data()  # Refresh recognizer data
+                print(f"Successfully enrolled {name} with {sample_count} samples!")
+                return True
+            except Exception as e:
+                print(f"Enrollment failed: {str(e)}")
+                return False
         else:
-            self._enroll_from_camera(name, student_id, num_samples)
+            print("Enrollment canceled or failed")
+            return False
 
     def _enroll_from_image(self, name: str, student_id: str, image_path: str):
         """Регистрация по существующему изображению"""
@@ -424,49 +547,51 @@ class FaceRecognizer:
 
         self._process_and_save_face(name, student_id, img, image_path)
 
-    def _enroll_from_camera(self, name: str, student_id: str, num_samples: int):
-        """Регистрация через захват с камеры"""
-        print(f"Capture {num_samples} samples for {name}...")
+    def _enroll_from_camera():
+        face_analyzer = FaceAnalysis(name="buffalo_l", providers=['CPUExecutionProvider'])  # or 'CUDAExecutionProvider'
+        face_analyzer.prepare(ctx_id=0)
+
         cap = cv2.VideoCapture(0)
-        captured = 0
-        embeddings = []
-        
-        try:
-            while captured < num_samples:
-                ret, frame = cap.read()
-                if not ret:
-                    continue
-                
-                # Показать предпросмотр
-                cv2.imshow("Capture - Press SPACE to capture", frame)
-                key = cv2.waitKey(1)
-                
-                if key == 32:  # SPACE
-                    faces = self.model.get(frame)
-                    if len(faces) == 1:
-                        embedding = faces[0].embedding.tolist()
-                        embeddings.append(embedding)
-                        captured += 1
-                        print(f"Captured sample {captured}/{num_samples}")
-                    elif len(faces) > 1:
-                        print("Error: Multiple faces detected!")
-                    else:
-                        print("Error: No faces detected!")
 
-                elif key == 27:  # ESC
-                    break
-            
-            if len(embeddings) > 0:
-                # Сохраняем усредненный эмбеддинг
-                avg_embedding = np.mean(embeddings, axis=0).tolist()
-                image_path = f"data/students/{student_id}.jpg"
-                cv2.imwrite(image_path, frame)
-                self.db.add_student(name, student_id, image_path, avg_embedding)
-                print(f"Successfully enrolled {name}!")
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-        finally:
-            cap.release()
-            cv2.destroyAllWindows()
+            # Detect faces in current frame
+            faces = face_analyzer.get(frame)
+
+            if len(faces) == 0:
+                cv2.putText(frame, "No face detected.", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+            elif len(faces) == 1:
+                face = faces[0]
+                box = face.bbox.astype(int)
+                cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+                cv2.putText(frame, "One face detected. Press 's' to save.", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+            else:
+                for face in faces:
+                    box = face.bbox.astype(int)
+                    cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (0, 0, 255), 2)
+                cv2.putText(frame, "Multiple faces detected! Please ensure only one face.", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+            cv2.imshow("Enroll Face", frame)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('q'):
+                break
+            elif key == ord('s') and len(faces) == 1:
+                # Save the face or its embedding
+                # your_save_function(faces[0])
+                print("Face enrolled.")
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
 
     def _async_recognition(self):
         """Фоновый поток для распознавания"""
