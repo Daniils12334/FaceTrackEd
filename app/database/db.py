@@ -61,16 +61,23 @@ class StudentDatabase:
             df['encoding'] = np.nan
             df.to_csv(self.students_file, index=False)
 
-class AttendanceLogger:
-        def __init__(self):
-            self.settings = Settings()
-            self.log_path = self.settings.get("file_paths.log_csv")
 
-        def log(self): #, student_id: str, timestamp: datetime
-             pass
-        
-        def load_logs(self) -> list[dict]:
-             pass
-        
-        def log_attendance(self, recognized_data):
-            pass
+
+class AttendanceLogger:
+    def __init__(self):
+        self.settings = Settings()
+        self.log_path = self.settings.get("file_paths.log_csv")
+
+    def load_logs(self) -> List[Dict]:
+        logs = []
+        with open(self.log_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) == 3:
+                    timestamp, user_id, name = row
+                    logs.append({
+                        'timestamp': timestamp.strip(),
+                        'user_id': user_id.strip(),
+                        'name': name.strip()
+                    })
+        return logs
