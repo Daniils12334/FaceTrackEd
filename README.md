@@ -48,24 +48,29 @@ FaceTrackEd automates student attendance tracking by recognizing faces from a we
 ---
 
 ## 📁 Project Structure
-FaceTrackEd/
-├── main.py # Entry point
-├── requirements.txt
-├── README.md
-├── config/
-│ ├── settings.json # App-wide settings
-│ └── settings.py # Settings loader
-├── data/
-│ ├── students.csv # Student registry (ID, name, encodings)
-│ ├── log.csv # Attendance logs
-│ └── faces/ # Stored student face images
-├── app/
-│ ├── core/app.py # CLI or GUI launcher
-│ ├── face/recognition.py # InsightFace recognition logic with voting
-│ ├── database/db.py # Data management
-│ ├── stats/analytics.py # Attendance analytics
-│ └── utils/helpers.py # Utilities and shared functions
 
+- **Root**
+  - `main.py` - Entry point
+  - `requirements.txt` - Dependencies
+  - `README.md` - Documentation
+  - **config/** - Configuration files
+    - `settings.json` - App settings
+    - `settings.py` - Settings loader
+  - **data/** - Data storage
+    - `students.csv` - Student registry
+    - `log.csv` - Attendance records
+    - **faces/** - Student face images
+  - **app/** - Application code
+    - **core/** - Main logic
+      - `app.py` - CLI/GUI launcher
+    - **face/** - Recognition
+      - `recognition.py` - Face analysis
+    - **database/** - Data handling
+      - `db.py` - Database operations
+    - **stats/** - Analytics
+      - `analytics.py` - Statistics engine
+    - **utils/** - Utilities
+      - `helpers.py` - Shared functions
 ---
 
 ## 🧠 How It Works
