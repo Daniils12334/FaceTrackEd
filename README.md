@@ -63,8 +63,12 @@ FaceTrackEd automates student attendance tracking by recognizing faces from a we
   - **app/** - Application code
     - **core/** - Main logic
       - `app.py` - CLI/GUI launcher
+      - `ui.py` - CLI/GUI launcher
+
     - **face/** - Recognition
       - `recognition.py` - Face analysis
+      - `camera.py` - Face analysis
+
     - **database/** - Data handling
       - `db.py` - Database operations
     - **stats/** - Analytics
@@ -115,8 +119,7 @@ python main.py
 
 ---
 
-## 📊 Screenshots *(Optional)*  
-*(Replace with actual screenshots after `![Description](path/to/image.jpg)` format)*  
+## 📊 Screenshots  
 **GUI Dashboard**  
 ![Dashboard](screenshots/dashboard.png)  
 
