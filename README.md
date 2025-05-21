@@ -153,7 +153,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📫 Contact  
 **Project Lead**: Daniils Baranovs
-- **Email**: [your.email@example.com](tmsthe70@gmail.com)  
-- **GitHub**: [@your-username](https://github.com/your-Daniils12334)  
+- **Email**: [tmsthe70@gmail.com](tmsthe70@gmail.com)  
+- **GitHub**: [https://github.com/your-Daniils12334](https://github.com/Daniils12334)  
 
 *Feel free to reach out for collaborations, bug reports, or feature requests!*  
