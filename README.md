@@ -120,6 +120,7 @@ python main.py
 ---
 
 ## 📊 Screenshots  
+
 **GUI Dashboard**  
 ![Dashboard](screenshots/dashboard.png)  
 

@@ -20,7 +20,8 @@ class StudentDatabase:
             with open(self.students_file, "r") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    encoding = np.fromstring(row['encoding'][1:-1], sep=',')
+                    encoding_str = row['encoding'][1:-1]  # Убираем скобки
+                    encoding = np.array([float(x) for x in encoding_str.split(',')])
                     student = Student(
                         student_id=row['student_id'],
                         name=row['name'],
@@ -32,10 +33,11 @@ class StudentDatabase:
             print(f"File {self.students_file} Not Found!")
         except Exception as e:
             print(f"Failed to load students: {str(e)}")
-        return students  # <= <-- ГАРАНТИРОВАННО возвращает список
+        return students
+
 
     def add_student(self, name: str, student_id: str, image_path: str, embedding: list):
-        """Добавление нового студента в базу"""
+        """Add new Student into DB"""
         new_entry = {
             'name': name,
             'student_id': student_id,
