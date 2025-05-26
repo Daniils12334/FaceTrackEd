@@ -104,7 +104,7 @@ FaceTrackEd automates student attendance tracking by recognizing faces from a we
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/FaceTrackEd.git
+   git clone https://github.com/Daniils12334/FaceTrackEd.git
    cd FaceTrackEd
 2.Create and activate a virtual environment:
 python -m venv venv
